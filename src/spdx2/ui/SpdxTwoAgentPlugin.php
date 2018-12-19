@@ -38,15 +38,6 @@ class SpdxTwoAgentPlugin extends AgentPlugin
   }
 
   /**
-   * @copydoc Fossology::Lib::Plugin::AgentPlugin::preInstall()
-   * @see Fossology::Lib::Plugin::AgentPlugin::preInstall()
-   */
-  function preInstall()
-  {
-    // no AgentCheckBox
-  }
-
-  /**
    * @brief Add uploads to report
    * @param array $uploads Array of upload ids
    * @return string
@@ -57,6 +48,31 @@ class SpdxTwoAgentPlugin extends AgentPlugin
       return '';
     }
     return '--uploadsAdd='. implode(',', array_keys($uploads));
+  }
+
+  public function AgentAdd($jobId, $uploadId, &$errorMsg, $dependencies=array(), $arguments=null)
+  {
+    $dependencies[] = "agent_pkgagent";
+    $dependencies[] = "agent_copyright";
+    $dependencies[] = "agent_ecc";
+    $dependencies[] = "agent_ninka";
+    $dependencies[] = "agent_mimetype";
+    $dependencies[] = "agent_monk";
+    $dependencies[] = "agent_nomos";
+
+    if ($this->AgentHasResults($uploadId) == 1)
+    {
+      return 0;
+    }
+
+    $jobQueueId = \IsAlreadyScheduled($jobId, $this->AgentName, $uploadId);
+    if ($jobQueueId != 0)
+    {
+      return $jobQueueId;
+    }
+
+    $args = is_array($arguments) ? '' : $arguments;
+    return $this->doAgentAdd($jobId, $uploadId, $errorMsg, $dependencies, $uploadId, $args);
   }
 }
 
