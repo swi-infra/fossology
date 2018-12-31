@@ -113,6 +113,8 @@ class BucketAgentPlugin extends AgentPlugin
     }
 
     $dependencies[] = "agent_nomos";
+    $dependencies[] = "agent_monk";
+    $dependencies[] = "agent_ninka";
     $dependencies[] = "agent_pkgagent";
     $jqargs = "bppk=$default_bucketpool_fk, upk=$uploadId";
     return $this->doAgentAdd($jobId, $uploadId, $errorMsg, $dependencies, $jqargs);
