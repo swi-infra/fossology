@@ -55,7 +55,6 @@ class SpdxTwoAgentPlugin extends AgentPlugin
     $dependencies[] = "agent_pkgagent";
     $dependencies[] = "agent_copyright";
     $dependencies[] = "agent_ecc";
-    $dependencies[] = "agent_ninka";
     $dependencies[] = "agent_mimetype";
     $dependencies[] = "agent_monk";
     $dependencies[] = "agent_nomos";
