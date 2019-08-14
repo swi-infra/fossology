@@ -104,6 +104,13 @@ char BuildVersion[]="wget_agent build version: NULL.\n";
  * \return 0 on a successful program execution
  */
 
+void init_global_vars (void)
+{
+  g.import_gold = 1;
+  g.upload_key = -1;
+}
+
+
 int main  (int argc, char *argv[])
 {
   int arg;
@@ -115,16 +122,13 @@ int main  (int argc, char *argv[])
   int user_pk;
   char *agent_desc = "Network downloader.  Uses wget(1).";
 
-  memset(GlobalTempFile,'\0',MAXCMD);
-  memset(GlobalURL,'\0',MAXCMD);
-  memset(GlobalParam,'\0',MAXCMD);
-  memset(GlobalType,'\0',MAXCMD);
-  GlobalUploadKey = -1;
   int upload_pk = 0;           // the upload primary key
   //int Agent_pk;
   char *COMMIT_HASH;
   char *VERSION;
   char agent_rev[MAXCMD];
+
+  init_global_vars();
 
   /* open the connection to the scheduler and configuration */
   fo_scheduler_connect(&argc, argv, &pgConn);
@@ -145,27 +149,27 @@ int main  (int argc, char *argv[])
       }
       break;
       case 'G':
-        GlobalImportGold=0;
+        g.import_gold = 0;
         break;
       case 'i':
         InitFlag=1;
         break;
       case 'k':
-        GlobalUploadKey = atol(optarg);
-        if (!GlobalTempFile[0])
-          strcpy(GlobalTempFile,"wget.default_download");
+        g.upload_key = atol(optarg);
+        if (!g.temp_file[0])
+          strcpy(g.temp_file,"wget.default_download");
         break;
       case 'A':
-        strncat(GlobalParam, " -A ", MAXCMD - strlen(GlobalParam) -1);
-        strncat(GlobalParam, optarg, MAXCMD - strlen(GlobalParam) -1);
+        strncat(g.param, " -A ", MAXCMD - strlen(g.param) -1);
+        strncat(g.param, optarg, MAXCMD - strlen(g.param) -1);
         break;
       case 'R':
-        strncat(GlobalParam, " -R ", MAXCMD - strlen(GlobalParam) -1);
-        strncat(GlobalParam, optarg, MAXCMD - strlen(GlobalParam) -1);
+        strncat(g.param, " -R ", MAXCMD - strlen(g.param) -1);
+        strncat(g.param, optarg, MAXCMD - strlen(g.param) -1);
         break;
       case 'l':
-        strncat(GlobalParam, " -l ", MAXCMD - strlen(GlobalParam) -1);
-        strncat(GlobalParam, optarg, MAXCMD - strlen(GlobalParam) -1);
+        strncat(g.param, " -l ", MAXCMD - strlen(g.param) -1);
+        strncat(g.param, optarg, MAXCMD - strlen(g.param) -1);
         break;
       case 'c': break; /* handled by fo_scheduler_connect() */
       case 'C':
@@ -199,7 +203,7 @@ int main  (int argc, char *argv[])
   VERSION = fo_sysconfig("wget_agent", "VERSION");
   sprintf(agent_rev, "%s.%s", VERSION, COMMIT_HASH);
   /* Get the Agent Key from the DB */
-  fo_GetAgentKey(pgConn, basename(argv[0]), GlobalUploadKey, agent_rev, agent_desc);
+  fo_GetAgentKey(pgConn, basename(argv[0]), g.upload_key, agent_rev, agent_desc);
 
   /* get proxy */
   GetProxy();
@@ -207,29 +211,29 @@ int main  (int argc, char *argv[])
   /* Run from the command-line (for testing) */
   for(arg=optind; arg < argc; arg++)
   {
-    memset(GlobalURL,'\0',sizeof(GlobalURL));
-    strncpy(GlobalURL,argv[arg],sizeof(GlobalURL));
+    memset(g.URL,'\0',sizeof(g.URL));
+    strncpy(g.URL,argv[arg],sizeof(g.URL));
     /* If the file contains "://" then assume it is a URL.
        Else, assume it is a file. */
-    LOG_VERBOSE0("Command-line: %s",GlobalURL);
-    if (strstr(GlobalURL,"://"))
+    LOG_VERBOSE0("Command-line: %s",g.URL);
+    if (strstr(g.URL,"://"))
     {
       fo_scheduler_heart(1);
       LOG_VERBOSE0("It's a URL");
-      if (GetURL(GlobalTempFile,GlobalURL,TempFileDir) != 0)
+      if (GetURL(g.temp_file,g.URL,TempFileDir) != 0)
       {
-        LOG_FATAL("Download of %s failed.",GlobalURL);
+        LOG_FATAL("Download of %s failed.",g.URL);
         SafeExit(21);
       }
-      if (GlobalUploadKey != -1) { DBLoadGold(); }
-      unlink(GlobalTempFile);
+      if (g.upload_key != -1) { DBLoadGold(); }
+      unlink(g.temp_file);
     }
     else /* must be a file */
     {
-      LOG_VERBOSE0("It's a file -- GlobalUploadKey = %ld",GlobalUploadKey);
-      if (GlobalUploadKey != -1)
+      LOG_VERBOSE0("It's a file -- g.upload_key = %ld",g.upload_key);
+      if (g.upload_key != -1)
       {
-        memcpy(GlobalTempFile,GlobalURL,MAXCMD);
+        memcpy(g.temp_file,g.URL,MAXCMD);
         DBLoadGold();
       }
     }
@@ -247,7 +251,7 @@ int main  (int argc, char *argv[])
         fo_scheduler_heart(1);
         /* set globals: uploadpk, downloadfile url, parameters */
         SetEnv(Parm,TempFileDir);
-        upload_pk = GlobalUploadKey;
+        upload_pk = g.upload_key;
 
         /* Check Permissions */
         if (GetUploadPerm(pgConn, upload_pk, user_pk) < PERM_WRITE)
@@ -261,42 +265,42 @@ int main  (int argc, char *argv[])
         snprintf(TempDir, MAXCMD-1, "%s/wget", TempFileDir); // /var/local/lib/fossology/agents/wget
         struct stat Status = {};
 
-        if (GlobalType[0])
+        if (g.type[0])
         {
           if (GetVersionControl() == 0)
           {
             DBLoadGold();
-            unlink(GlobalTempFile);
+            unlink(g.temp_file);
           }
           else
           {
             LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s Type=%s",
-                GlobalUploadKey,GlobalUploadKey,GlobalTempFile,GlobalURL, GlobalType);
+                g.upload_key,g.upload_key,g.temp_file,g.URL, g.type);
             SafeExit(23);
           }
         }
-        else if (strstr(GlobalURL, "*") || stat(GlobalURL, &Status) == 0)
+        else if (strstr(g.URL, "*") || stat(g.URL, &Status) == 0)
         {
-          if (!Archivefs(GlobalURL, GlobalTempFile, TempFileDir, Status))
+          if (!Archivefs(g.URL, g.temp_file, TempFileDir, Status))
           {
-            LOG_FATAL("Failed to archive. GlobalURL, GlobalTempFile, TempFileDir are: %s, %s, %s, "
-               "Mode is: %lo (octal)\n", GlobalURL, GlobalTempFile, TempFileDir, (unsigned long) Status.st_mode);
+            LOG_FATAL("Failed to archive. g.URL, g.temp_file, TempFileDir are: %s, %s, %s, "
+               "Mode is: %lo (octal)\n", g.URL, g.temp_file, TempFileDir, (unsigned long) Status.st_mode);
             SafeExit(50);
           }
           DBLoadGold();
-          unlink(GlobalTempFile);
+          unlink(g.temp_file);
         }
         else
         {
-          if (GetURL(GlobalTempFile,GlobalURL,TempDir) == 0)
+          if (GetURL(g.temp_file,g.URL,TempDir) == 0)
           {
             DBLoadGold();
-            unlink(GlobalTempFile);
+            unlink(g.temp_file);
           }
           else
           {
             LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s",
-                GlobalUploadKey,GlobalUploadKey,GlobalTempFile,GlobalURL);
+                g.upload_key,g.upload_key,g.temp_file,g.URL);
             SafeExit(22);
           }
         }

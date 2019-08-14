@@ -41,26 +41,34 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define stat64(x,y) stat(x,y)
 #define systemError(line, error, cmd)  LOG_FATAL("[%s:%d] Error exit: %d, CMD:%s\n", __FILE__, line, WEXITSTATUS(error), cmd);
 
-typedef struct stat stat_t;
-
-#include "libfossology.h"
-
-#include "../../ununpack/agent/checksum.h"
-
 #define MAXCMD  2048
 #define FILEPATH 2048
+
+typedef struct stat stat_t;
+
+typedef struct
+{
+  long upload_key;      ///< Input for this system
+  char temp_file[MAXCMD];  ///< Temp file to be used
+  char URL[MAXCMD];       ///< URL to download
+  char type[MAXCMD];      ///< Type of download (FILE/version control)
+  char param[MAXCMD];     ///< Additional parameters
+  char *proxy[6];         ///< Proxy from fossology.conf
+  char http_proxy[MAXCMD]; ///< HTTP proxy command to use
+  int import_gold;       ///< Set to 0 to not store file in gold repository
+} global_vars;
+
+#include "libfossology.h"
+#include "../../ununpack/agent/checksum.h"
 
 extern char SQL[MAXCMD];
 
 /* for the DB */
 extern PGconn *pgConn;
 /* input for this system */
-extern long GlobalUploadKey;
-extern char GlobalTempFile[MAXCMD];
-extern char GlobalURL[MAXCMD];
-extern char GlobalParam[MAXCMD];
-extern char GlobalType[MAXCMD];
-extern int GlobalImportGold; /* set to 0 to not store file in gold repository */
+
+extern global_vars g;
+
 extern gid_t ForceGroup;
 
 /* for debugging */
