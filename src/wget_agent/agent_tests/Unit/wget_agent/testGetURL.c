@@ -96,7 +96,7 @@ void testGetURLNormal_URLIsOneFile()
  */
 void testGetURLAbnormal_URLIsOneDir()
 {
-  strcpy(GlobalParam, "-l 1 -A *.list -R *.deb");
+  strcpy(g.param, "-l 1 -A *.list -R *.deb");
   strcpy(URL, "https://mirrors.kernel.org/fossology/releases/3.0.0/ubuntu/14.04/");
   strcpy(TempFileDir, "./test_result/");
   strcpy(TempFile, "./test_result/fossology.sources.list");
