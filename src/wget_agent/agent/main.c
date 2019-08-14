@@ -110,19 +110,88 @@ void init_global_vars (void)
   g.upload_key = -1;
 }
 
+void run_from_scheduler (char *tmp_file_dir)
+{
+  int user_pk;
+  int upload_pk = 0;           // the upload primary key
+  char *parm = NULL;
+
+  user_pk = fo_scheduler_userID(); /* get user_pk for user who queued the agent */
+  while(fo_scheduler_next())
+  {
+    parm = fo_scheduler_current(); /* get piece of information, including upload_pk, downloadfile url, and parameters */
+    if (parm && parm[0])
+    {
+      fo_scheduler_heart(1);
+      /* set globals: uploadpk, downloadfile url, parameters */
+      SetEnv(parm,tmp_file_dir);
+      upload_pk = g.upload_key;
+
+      /* Check Permissions */
+      if (GetUploadPerm(pgConn, upload_pk, user_pk) < PERM_WRITE)
+      {
+        LOG_ERROR("You have no update permissions on upload %d", upload_pk);
+        continue;
+      }
+
+      char TempDir[MAXCMD];
+      memset(TempDir,'\0',MAXCMD);
+      snprintf(TempDir, MAXCMD-1, "%s/wget", tmp_file_dir); // /var/local/lib/fossology/agents/wget
+      struct stat Status = {};
+
+      if (g.type[0])
+      {
+        if (GetVersionControl() == 0)
+        {
+          DBLoadGold();
+          unlink(g.temp_file);
+        }
+        else
+        {
+          LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s Type=%s",
+              g.upload_key,g.upload_key,g.temp_file,g.URL, g.type);
+          SafeExit(23);
+        }
+      }
+      else if (strstr(g.URL, "*") || stat(g.URL, &Status) == 0)
+      {
+        if (!Archivefs(g.URL, g.temp_file, tmp_file_dir, Status))
+        {
+          LOG_FATAL("Failed to archive. g.URL, g.temp_file, tmp_file_dir are: %s, %s, %s, "
+             "Mode is: %lo (octal)\n", g.URL, g.temp_file, tmp_file_dir, (unsigned long) Status.st_mode);
+          SafeExit(50);
+        }
+        DBLoadGold();
+        unlink(g.temp_file);
+      }
+      else
+      {
+        if (GetURL(g.temp_file,g.URL,TempDir) == 0)
+        {
+          DBLoadGold();
+          unlink(g.temp_file);
+        }
+        else
+        {
+          LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s",
+              g.upload_key,g.upload_key,g.temp_file,g.URL);
+          SafeExit(22);
+        }
+      }
+    }
+  }
+}
+
 
 int main  (int argc, char *argv[])
 {
   int arg;
-  char *Parm = NULL;
-  char *TempFileDir=NULL;
+  char *tmp_file_dir = NULL;
   int c;
-  int InitFlag=0;
+  int InitFlag = 0;
   int CmdlineFlag = 0; /* run from command line flag, 1 yes, 0 not */
-  int user_pk;
   char *agent_desc = "Network downloader.  Uses wget(1).";
 
-  int upload_pk = 0;           // the upload primary key
   //int Agent_pk;
   char *COMMIT_HASH;
   char *VERSION;
@@ -139,7 +208,7 @@ int main  (int argc, char *argv[])
     switch(c)
     {
       case 'd':
-        TempFileDir = PathCheck(optarg);
+        tmp_file_dir = PathCheck(optarg);
         break;
       case 'g':
       {
@@ -171,7 +240,8 @@ int main  (int argc, char *argv[])
         strncat(g.param, " -l ", MAXCMD - strlen(g.param) -1);
         strncat(g.param, optarg, MAXCMD - strlen(g.param) -1);
         break;
-      case 'c': break; /* handled by fo_scheduler_connect() */
+      case 'c':
+        break; /* handled by fo_scheduler_connect() */
       case 'C':
         CmdlineFlag = 1;
         break;
@@ -179,13 +249,14 @@ int main  (int argc, char *argv[])
         agent_verbose++;   // global agent verbose flag.
         break;
       case 'V':
-       printf("%s", BuildVersion);
-       SafeExit(0);
+        printf("%s", BuildVersion);
+        SafeExit(0);
       default:
         Usage(argv[0]);
         SafeExit(-1);
     }
   }
+
   if (argc - optind > 1)
   {
     Usage(argv[0]);
@@ -220,7 +291,7 @@ int main  (int argc, char *argv[])
     {
       fo_scheduler_heart(1);
       LOG_VERBOSE0("It's a URL");
-      if (GetURL(g.temp_file,g.URL,TempFileDir) != 0)
+      if (GetURL(g.temp_file,g.URL,tmp_file_dir) != 0)
       {
         LOG_FATAL("Download of %s failed.",g.URL);
         SafeExit(21);
@@ -239,74 +310,10 @@ int main  (int argc, char *argv[])
     }
   }
 
-  /* Run from scheduler! */
-  if (0 == CmdlineFlag)
+  if (CmdlineFlag == 0)
   {
-    user_pk = fo_scheduler_userID(); /* get user_pk for user who queued the agent */
-    while(fo_scheduler_next())
-    {
-      Parm = fo_scheduler_current(); /* get piece of information, including upload_pk, downloadfile url, and parameters */
-      if (Parm && Parm[0])
-      {
-        fo_scheduler_heart(1);
-        /* set globals: uploadpk, downloadfile url, parameters */
-        SetEnv(Parm,TempFileDir);
-        upload_pk = g.upload_key;
-
-        /* Check Permissions */
-        if (GetUploadPerm(pgConn, upload_pk, user_pk) < PERM_WRITE)
-        {
-          LOG_ERROR("You have no update permissions on upload %d", upload_pk);
-          continue;
-        }
-
-        char TempDir[MAXCMD];
-        memset(TempDir,'\0',MAXCMD);
-        snprintf(TempDir, MAXCMD-1, "%s/wget", TempFileDir); // /var/local/lib/fossology/agents/wget
-        struct stat Status = {};
-
-        if (g.type[0])
-        {
-          if (GetVersionControl() == 0)
-          {
-            DBLoadGold();
-            unlink(g.temp_file);
-          }
-          else
-          {
-            LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s Type=%s",
-                g.upload_key,g.upload_key,g.temp_file,g.URL, g.type);
-            SafeExit(23);
-          }
-        }
-        else if (strstr(g.URL, "*") || stat(g.URL, &Status) == 0)
-        {
-          if (!Archivefs(g.URL, g.temp_file, TempFileDir, Status))
-          {
-            LOG_FATAL("Failed to archive. g.URL, g.temp_file, TempFileDir are: %s, %s, %s, "
-               "Mode is: %lo (octal)\n", g.URL, g.temp_file, TempFileDir, (unsigned long) Status.st_mode);
-            SafeExit(50);
-          }
-          DBLoadGold();
-          unlink(g.temp_file);
-        }
-        else
-        {
-          if (GetURL(g.temp_file,g.URL,TempDir) == 0)
-          {
-            DBLoadGold();
-            unlink(g.temp_file);
-          }
-          else
-          {
-            LOG_FATAL("upload %ld File retrieval failed: uploadpk=%ld tempfile=%s URL=%s",
-                g.upload_key,g.upload_key,g.temp_file,g.URL);
-            SafeExit(22);
-          }
-        }
-      }
-    }
-  } /* if run from scheduler */
+    run_from_scheduler(tmp_file_dir);
+  }
 
   SafeExit(0);
   exit(0);  /* to prevent compiler warning */

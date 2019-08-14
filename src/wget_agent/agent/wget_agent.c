@@ -110,23 +110,28 @@ void DBLoadGold()
         g.upload_key,g.temp_file,g.URL);
     SafeExit(1);
   }
-  if (file != (FILE*) NULL)
+
+  if (file)
   {
     read = fscanf(file, "%64s", SHA256);
     rc = WEXITSTATUS(pclose(file));
+
+    if (rc || read != 1)
+    {
+      LOG_FATAL("Unable to calculate SHA256 of %s\n", g.temp_file);
+      SafeExit(56);
+    }
   }
-  if (file == (FILE*) NULL || rc != 0 || read != 1)
-  {
-    LOG_FATAL("Unable to calculate SHA256 of %s\n", g.temp_file);
-    SafeExit(56);
-  }
+
   // Change SHA256 to upper case like other checksums
   for (i = 0; i < 65; i++)
   {
     SHA256[i] = toupper(SHA256[i]);
   }
+
   Sum = SumComputeFile(Fin);
   fclose(Fin);
+
   if ((int)ForceGroup > 0)
   {
     rc = chown(g.temp_file,-1,ForceGroup);
@@ -139,12 +144,14 @@ void DBLoadGold()
         g.upload_key,g.temp_file,g.URL);
     SafeExit(2);
   }
+
   if (Sum->DataLen <= 0)
   {
     LOG_FATAL("upload %ld No bytes downloaded from %s to %s.",
         g.upload_key,g.URL,g.temp_file);
     SafeExit(3);
   }
+
   Unique = SumToString(Sum);
   LOG_VERBOSE0("Unique %s",Unique);
 
@@ -152,7 +159,7 @@ void DBLoadGold()
   {
     LOG_VERBOSE0("Import Gold %s",Unique);
     rc = fo_RepImport(g.temp_file,"gold",Unique,1);
-    if (rc != 0)
+    if (rc)
     {
       LOG_FATAL("upload %ld Failed to import %s from %s into repository gold %s",
           g.upload_key,g.temp_file,g.URL,Unique);
@@ -170,6 +177,7 @@ void DBLoadGold()
   {
     Path = g.temp_file;
   } /* else if !import_gold */
+
   LOG_VERBOSE0("Path is %s",Path);
 
   if (!Path)
@@ -178,18 +186,21 @@ void DBLoadGold()
         g.upload_key,Unique);
     SafeExit(5);
   }
+
   LOG_VERBOSE0("Import files %s",Path);
-  if (fo_RepImport(Path,"files",Unique,1) != 0)
+  if (fo_RepImport(Path,"files",Unique,1))
   {
     LOG_FATAL("upload %ld Failed to import %s from %s into files",
         g.upload_key,Unique,Path);
     SafeExit(6);
   }
+
   if ((int)ForceGroup >= 0)
   {
     rc = chown(Path,-1,ForceGroup);
     if (rc) LOG_ERROR("chown failed on %s, error: %s", Path, strerror(errno));
   }
+
   if (Path != g.temp_file)
   {
     if(Path)
@@ -209,10 +220,13 @@ void DBLoadGold()
   snprintf(SQL,MAXCMD-1,"SELECT pfile_pk FROM pfile WHERE pfile_sha1 = '%.40s' AND pfile_md5 = '%.32s' AND pfile_size = %s;",
       SHA1,MD5,Len);
   result =  PQexec(pgConn, SQL); /* SELECT */
-  if (fo_checkPQresult(pgConn, result, SQL, __FILE__, __LINE__)) SafeExit(7);
+
+  if (fo_checkPQresult(pgConn, result, SQL, __FILE__, __LINE__)) {
+    SafeExit(7);
+  }
 
   /* See if pfile needs to be added */
-  if (PQntuples(result) <=0)
+  if (PQntuples(result) <= 0)
   {
     /* Insert it */
     memset(SQL,'\0',MAXCMD);
@@ -225,6 +239,7 @@ void DBLoadGold()
     result = PQexec(pgConn, "SELECT currval('pfile_pfile_pk_seq')");
     if (fo_checkPQresult(pgConn, result, SQL, __FILE__, __LINE__)) SafeExit(182);
   }
+
   PfileKey = atol(PQgetvalue(result,0,0));
   LOG_VERBOSE0("pfile_pk = %ld",PfileKey);
 
@@ -281,14 +296,15 @@ int TaintURL(char *Sin, char *Sout, int SoutSize)
   for(i=0,si=0; (si<SoutSize) && (Sin[i] != '\0'); i++)
   {
     if (Sin[i] == '#') return(0);  /* end at the start of comment */
-    if (!strchr("'`",Sin[i]) && !isspace(Sin[i])) Sout[si++] = Sin[i];
-    else
-    {
+    if (!strchr("'`",Sin[i]) && !isspace(Sin[i])) {
+      Sout[si++] = Sin[i];
+    } else {
       if (si+3 >= SoutSize) return(0); /* no room */
       snprintf(Sout+si,4,"%%%02X",Sin[i]);
       si+=3;
     }
   }
+
   return(Sin[i]=='\0');
 } /* TaintURL() */
 
@@ -512,10 +528,11 @@ int GetVersionControl()
 
   rc = system(command);
 
-  if (resethome) // rollback
+  if (resethome) { // rollback
     unsetenv("HOME");
-  else
+  } else {
     setenv("HOME", homeenv, 1);
+  }
 
   if (rc != 0)
   {
@@ -534,6 +551,7 @@ int GetVersionControl()
 
   snprintf(command,MAXCMD-1, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", g.temp_file, TempFileDirectory);
   rc = system(command);
+
   if (rc != 0)
   {
     systemError(__LINE__, rc_system, DeleteTempDirCmd)
@@ -546,7 +564,9 @@ int GetVersionControl()
 
   /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
   rc_system = system(DeleteTempDirCmd);
-  if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
+  if (!WIFEXITED(rc_system)) {
+    systemError(__LINE__, rc_system, DeleteTempDirCmd)
+  }
 
   return 0; // succeed to retrieve source
 }
@@ -749,9 +769,8 @@ int Archivefs(char *Path, char *TempFile, char *TempFileDir, struct stat Status)
       return 0;
     }
   }
-  else return 0; /* neither a directory nor a regular file */
 
-  return 1;
+  return 0; /* neither a directory nor a regular file */
 }
 
 /**
@@ -771,6 +790,7 @@ void GetProxy()
   {
     g.proxy[i++] = NULL;
   }
+
   GError* error1 = NULL;
   GError* error2 = NULL;
   GError* error3 = NULL;
@@ -785,7 +805,6 @@ void GetProxy()
   trim(g.proxy[i++]);
   g.proxy[i] = fo_config_get(sysconfig, "FOSSOLOGY", "no_proxy", &error4);
   trim(g.proxy[i++]);
-
 
   if (g.proxy[0] && g.proxy[0][0])
   {
@@ -861,25 +880,27 @@ void replace_url_with_auth()
   char *token = NULL;
   char *temp = NULL;
 
-  if (strstr(g.param, "password") && strstr(g.param, "username"))
+  if (!(strstr(g.param, "password") && strstr(g.param, "username")))
   {
-    temp = strstr(g.URL, needle2);
-    strcpy(URI, temp + 2);
-    strncpy(http, g.URL, strlen(g.URL) - strlen(URI));
-
-    /* get the first token */
-    token = strtok(g.param, needle);
-    /* walk through other tokens */
-    while( token != NULL )
-    {
-      if (1 == index) username = token;
-      if (3 == index) password = token;
-      token = strtok(NULL, needle);
-      index++;
-    }
-    snprintf(g.URL, FILEPATH, "%s%s:%s@%s", http, username, password, URI);
-    memset(g.param,'\0',MAXCMD);
+    return;
   }
+
+  temp = strstr(g.URL, needle2);
+  strcpy(URI, temp + 2);
+  strncpy(http, g.URL, strlen(g.URL) - strlen(URI));
+
+  /* get the first token */
+  token = strtok(g.param, needle);
+  /* walk through other tokens */
+  while( token != NULL )
+  {
+    if (1 == index) username = token;
+    if (3 == index) password = token;
+    token = strtok(NULL, needle);
+    index++;
+  }
+  snprintf(g.URL, FILEPATH, "%s%s:%s@%s", http, username, password, URI);
+  memset(g.param,'\0',MAXCMD);
 }
 
 /**
@@ -915,9 +936,7 @@ void MaskPassword()
     sprintf(newParam, " --username %s --password ****", username);
     memset(g.param, '\0', MAXCMD);
     strcpy(g.param, newParam);
-  }
-  // GIT
-  else {
+  } else { // GIT
     // First : from http://
     index = strcspn(g.URL, ":");
     // Second after username
@@ -956,18 +975,20 @@ char* GetVersionControlCommand(int withPassword)
   if (0 == strcmp(g.type, Type[0]))
   {
     if (g.proxy[0] && g.proxy[0][0])
+    {
       sprintf(command, "svn --config-option servers:global:http-proxy-host=%s --config-option servers:global:http-proxy-port=%s export %s %s %s --no-auth-cache >/dev/null 2>&1", g.proxy[4], g.proxy[5], g.URL, g.param, TempFileDirectory);
-    else
+    } else {
       sprintf(command, "svn export %s %s %s --no-auth-cache >/dev/null 2>&1", g.URL, g.param, TempFileDirectory);
-  }
-  else if (0 == strcmp(g.type, Type[1]))
+    }
+  } else if (0 == strcmp(g.type, Type[1]))
   {
     replace_url_with_auth();
     if (g.proxy[0] && g.proxy[0][0])
+    {
       sprintf(command, "git config --global http.proxy %s && git clone %s %s %s  && rm -rf %s/.git", g.proxy[0], g.URL, g.param, TempFileDirectory, TempFileDirectory);
-    else
+    } else {
       sprintf(command, "git clone %s %s %s >/dev/null 2>&1 && rm -rf %s/.git", g.URL, g.param, TempFileDirectory, TempFileDirectory);
+    }
   }
-
   return command;
 }
