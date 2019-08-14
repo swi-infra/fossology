@@ -23,7 +23,11 @@
  * \brief wget_agent: Retrieve a file and put it in the database.
  */
 
+#define _GNU_SOURCE           // for asprintf
+
 #include "wget_agent.h"
+
+#define EXIT_MEM_ERROR  -999
 
 char SQL[MAXCMD];
 
@@ -321,18 +325,23 @@ int TaintURL(char *Sin, char *Sout, int SoutSize)
  */
 int GetURL(char *TempFile, char *URL, char *TempFileDir)
 {
-  char CMD[MAXCMD];
+  char *cmd;
   char TaintedURL[MAXCMD];
-  char TempFileDirectory[MAXCMD];
-  char DeleteTempDirCmd[MAXCMD];
+  char *tmp_file_dir;
+  char *del_tmp_dir_cmd;
   int rc;
 
-  memset(TempFileDirectory,'\0',MAXCMD);
-  memset(DeleteTempDirCmd,'\0',MAXCMD);
-
   /* save each upload files in /srv/fossology/repository/localhost/wget/wget.xxx.dir/ */
-  sprintf(TempFileDirectory, "%s.dir", TempFile);
-  sprintf(DeleteTempDirCmd, "rm -rf %s", TempFileDirectory);
+  if (asprintf(&tmp_file_dir, "%s.dir", TempFile) == -1)
+  {
+    SafeExit(EXIT_MEM_ERROR);
+  }
+
+  if (asprintf(&del_tmp_dir_cmd, "rm -rf %s", tmp_file_dir) == -1)
+  {
+    free(tmp_file_dir);
+    SafeExit(EXIT_MEM_ERROR);
+  }
 #if 1
   char WgetArgs[]="--no-check-certificate --progress=dot -rc -np -e robots=off";
 #else
@@ -343,10 +352,11 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
   if (!TaintURL(URL,TaintedURL,MAXCMD))
   {
     LOG_FATAL("Failed to taint the URL '%s'",URL);
+    free(del_tmp_dir_cmd);
+    free(tmp_file_dir);
     SafeExit(10);
   }
 
-  memset(CMD,'\0',MAXCMD);
   /*
    Wget options:
    --progress=dot :: display a new line as it progresses.
@@ -391,108 +401,188 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
   {
     /* Delete the temp file if it exists */
     unlink(TempFile);
-    snprintf(CMD,MAXCMD-1," %s /usr/bin/wget -q %s -P '%s' '%s' %s %s 2>&1",
-        proxy, WgetArgs,TempFileDirectory,TaintedURL,g.param, no_proxy);
+    if (asprintf(&cmd, " %s /usr/bin/wget -q %s -P '%s' '%s' %s %s 2>&1",
+          proxy, WgetArgs, tmp_file_dir, TaintedURL, g.param, no_proxy) == -1)
+    {
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      SafeExit(EXIT_MEM_ERROR);
+    }
   }
-  else if(TempFileDir && TempFileDir[0])
+  else if(tmp_file_dir[0])
   {
-    snprintf(CMD,MAXCMD-1," %s /usr/bin/wget -q %s -P '%s' '%s' %s %s 2>&1",
-        proxy, WgetArgs, TempFileDir, TaintedURL, g.param, no_proxy);
+    if (asprintf(&cmd, " %s /usr/bin/wget -q %s -P '%s' '%s' %s %s 2>&1",
+        proxy, WgetArgs, tmp_file_dir, TaintedURL, g.param, no_proxy) == -1)
+    {
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      SafeExit(EXIT_MEM_ERROR);
+    }
   }
   else
   {
-    snprintf(CMD,MAXCMD-1," %s /usr/bin/wget -q %s '%s' %s %s 2>&1",
-        proxy, WgetArgs,TaintedURL, g.param, no_proxy);
+    if (asprintf(&cmd, " %s /usr/bin/wget -q %s '%s' %s %s 2>&1",
+        proxy, WgetArgs, TaintedURL, g.param, no_proxy) == -1)
+    {
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      SafeExit(EXIT_MEM_ERROR);
+    }
   }
+
   /* the command is like
   ". /usr/local/etc/fossology/Proxy.conf;
      /usr/bin/wget -q --no-check-certificate --progress=dot -rc -np -e robots=off -P
      '/srv/fossology/repository/localhost/wget/wget.xxx.dir/'
      'http://a.org/file' -l 1 -R index.html*  2>&1"
    */
-  LOG_VERBOSE0("CMD: %s", CMD);
-  rc = system(CMD);
+  LOG_VERBOSE0("CMD: %s", cmd);
+  rc = system(cmd);
 
   if (WIFEXITED(rc) && (WEXITSTATUS(rc) != 0))
   {
-    LOG_FATAL("upload %ld Download failed; Return code %d from: %s",g.upload_key,WEXITSTATUS(rc),CMD);
+    LOG_FATAL("upload %ld Download failed; Return code %d from: %s",g.upload_key,WEXITSTATUS(rc),cmd);
+    free(cmd);
     unlink(g.temp_file);
-    rc_system = system(DeleteTempDirCmd);
-    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
+    rc_system = system(del_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+
+    free(del_tmp_dir_cmd);
+    free(tmp_file_dir);
     SafeExit(12);
   }
 
-  /* Run from scheduler! store /srv/fossology/repository/localhost/wget/wget.xxx.dir/<files|directories> to one temp file */
-  if (TempFile && TempFile[0])
-  {
-    char TempFilePath[MAXCMD];
-    memset(TempFilePath,'\0',MAXCMD);
-    /* for one url http://a.org/test.deb, TempFilePath should be /srv/fossology/repository/localhost/wget/wget.xxx.dir/a.org/test.deb */
-    int Position = GetPosition(TaintedURL);
-    if (0 == Position)
-    {
-      LOG_FATAL("path %s is not http://, https://, or ftp://", TaintedURL);
-      unlink(g.temp_file);
-      rc_system = system(DeleteTempDirCmd);
-      if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
-      SafeExit(26);
-    }
-    snprintf(TempFilePath, MAXCMD-1, "%s/%s", TempFileDirectory, TaintedURL + Position);
+  free(cmd);
 
-    if (!stat(TempFilePath, &sb))
+  if (!(TempFile && TempFile[0]))
+  {
+    /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
+    rc_system = system(del_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+    LOG_VERBOSE0("upload %ld Downloaded %s to %s",g.upload_key,URL,TempFile);
+
+    free(del_tmp_dir_cmd);
+    free(tmp_file_dir);
+    return(0);
+  }
+
+  /* Run from scheduler! store /srv/fossology/repository/localhost/wget/wget.xxx.dir/<files|directories> to one temp file */
+  char* tmp_file_path;
+
+  /* for one url http://a.org/test.deb, TempFilePath should be /srv/fossology/repository/localhost/wget/wget.xxx.dir/a.org/test.deb */
+  int Position = GetPosition(TaintedURL);
+  if (0 == Position)
+  {
+    LOG_FATAL("path %s is not http://, https://, or ftp://", TaintedURL);
+    unlink(g.temp_file);
+    rc_system = system(del_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+
+    free(del_tmp_dir_cmd);
+    free(tmp_file_dir);
+    SafeExit(26);
+  }
+
+  if (asprintf(&tmp_file_path, "%s/%s", tmp_file_dir, TaintedURL + Position) == -1)
+  {
+    free(del_tmp_dir_cmd);
+    free(tmp_file_dir);
+    SafeExit(EXIT_MEM_ERROR);
+  }
+
+  if (!stat(tmp_file_path, &sb))
+  {
+    if (S_ISDIR(sb.st_mode))
     {
-      memset(CMD,'\0',MAXCMD);
-      if (S_ISDIR(sb.st_mode))
+      if (asprintf(&cmd, "find '%s' -mindepth 1 -type d -empty -exec rmdir {} \\; > /dev/null 2>&1", tmp_file_path) == -1)
       {
-        snprintf(CMD,MAXCMD-1, "find '%s' -mindepth 1 -type d -empty -exec rmdir {} \\; > /dev/null 2>&1", TempFilePath);
-        rc_system = system(CMD); // delete all empty directories downloaded
-        if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, CMD)
-        memset(CMD,'\0',MAXCMD);
-        snprintf(CMD,MAXCMD-1, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", TempFile, TempFilePath);
+        free(del_tmp_dir_cmd);
+        free(tmp_file_dir);
+        free(tmp_file_path);
+        SafeExit(EXIT_MEM_ERROR);
       }
-      else
+
+      rc_system = system(cmd); // delete all empty directories downloaded
+      if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, cmd)
+
+      free(cmd);
+      if (asprintf(&cmd, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", TempFile, tmp_file_path) == -1)
       {
-        snprintf(CMD,MAXCMD-1, "mv '%s' '%s' 2>&1", TempFilePath, TempFile);
-      }
-      rc_system = system(CMD);
-      if (rc_system != 0)
-      {
-        systemError(__LINE__, rc_system, CMD)
-        unlink(g.temp_file);
-        rc_system = system(DeleteTempDirCmd);
-        if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
-        SafeExit(24); // failed to store the temperary directory(one file) as one temperary file
+        free(del_tmp_dir_cmd);
+        free(tmp_file_dir);
+        free(tmp_file_path);
+        SafeExit(EXIT_MEM_ERROR);
       }
     }
     else
     {
-      memset(CMD,'\0',MAXCMD);
-      snprintf(CMD,MAXCMD-1, "find '%s' -type f -exec mv {} %s \\; > /dev/null 2>&1", TempFileDirectory, TempFile);
-      rc_system = system(CMD);
-      if (rc_system != 0)
+      if (asprintf(&cmd, "mv '%s' '%s' 2>&1", tmp_file_path, TempFile) == -1)
       {
-        systemError(__LINE__, rc_system, CMD)
-        unlink(g.temp_file);
-        rc_system = system(DeleteTempDirCmd);
-        if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
-        SafeExit(24); // failed to store the temperary directory(one file) as one temperary file
+        free(del_tmp_dir_cmd);
+        free(tmp_file_dir);
+        free(tmp_file_path);
+        SafeExit(EXIT_MEM_ERROR);
       }
+    }
+
+    free(tmp_file_path);
+
+    rc_system = system(cmd);
+    if (rc_system != 0)
+    {
+      systemError(__LINE__, rc_system, cmd)
+      unlink(g.temp_file);
+      rc_system = system(del_tmp_dir_cmd);
+      if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      free(cmd);
+      SafeExit(24); // failed to store the temperary directory(one file) as one temperary file
+    }
+  }
+  else
+  {
+    if (asprintf(&cmd, "find '%s' -type f -exec mv {} %s \\; > /dev/null 2>&1", tmp_file_dir, TempFile) == -1)
+    {
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      SafeExit(EXIT_MEM_ERROR);
+    }
+    rc_system = system(cmd);
+    if (rc_system != 0)
+    {
+      systemError(__LINE__, rc_system, cmd)
+      unlink(g.temp_file);
+      rc_system = system(del_tmp_dir_cmd);
+      if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+
+      free(del_tmp_dir_cmd);
+      free(tmp_file_dir);
+      free(cmd);
+      SafeExit(24); // failed to store the temperary directory(one file) as one temperary file
     }
   }
 
-  if (TempFile && TempFile[0] && !IsFile(TempFile,1))
+  free(tmp_file_dir);
+  if (!IsFile(TempFile,1))
   {
-    LOG_FATAL("upload %ld File %s not created from URL: %s, CMD: %s",g.upload_key,TempFile,URL, CMD);
+    LOG_FATAL("upload %ld File %s not created from URL: %s, CMD: %s",g.upload_key,TempFile,URL, cmd);
     unlink(g.temp_file);
-    rc_system = system(DeleteTempDirCmd);
-    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
+    rc_system = system(del_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
+    free(del_tmp_dir_cmd);
+    free(cmd);
     SafeExit(15);
   }
 
+  free(cmd);
   /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
-  rc_system = system(DeleteTempDirCmd);
-  if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
+  rc_system = system(del_tmp_dir_cmd);
+  if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, del_tmp_dir_cmd)
   LOG_VERBOSE0("upload %ld Downloaded %s to %s",g.upload_key,URL,TempFile);
+
+  free(del_tmp_dir_cmd);
   return(0);
 } /* GetURL() */
 
@@ -503,9 +593,9 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
 int GetVersionControl()
 {
   char *command = NULL;
-  char TempFileDirectory[MAXCMD];
-  char DeleteTempDirCmd[MAXCMD];
-  char TempHome[MAXCMD];
+  char *tmp_file_dir;
+  char *delete_tmp_dir_cmd;
+  char *tmp_home;  
   int rc = 0;
   int resethome = 0; // 0: default; 1: home is null before setting, should rollback
   int rc_system =0;
@@ -517,16 +607,34 @@ int GetVersionControl()
   /* We need HOME to point to where .gitconfig is installed
    * path is the repository path and .gitconfig is installed in its parent directory
    */
-  snprintf(TempHome, sizeof(TempHome), "%s/..", fo_config_get(sysconfig, "FOSSOLOGY", "path", NULL));
-  setenv("HOME", TempHome, 1);
+  if (asprintf(&tmp_home, "%s/..", fo_config_get(sysconfig, "FOSSOLOGY", "path", NULL)) == -1)
+  {
+    return -1;
+  }
+  setenv("HOME", tmp_home, 1);
+  free(tmp_home);
 
   /* save each upload files in /srv/fossology/repository/localhost/wget/wget.xxx.dir/ */
-  sprintf(TempFileDirectory, "%s.dir", g.temp_file);
-  sprintf(DeleteTempDirCmd, "rm -rf %s", TempFileDirectory);
+  if (asprintf(&tmp_file_dir, "%s.dir", g.temp_file) == -1)
+  {
+    return -1;
+  }
+
+  if (asprintf(&delete_tmp_dir_cmd, "rm -rf %s", tmp_file_dir) == -1)
+  {
+    free(tmp_file_dir);
+    return -1;
+  }
 
   command = GetVersionControlCommand(1);
+  if (!command) {
+    free(tmp_file_dir);
+    free(delete_tmp_dir_cmd);
+    return -1;
+  }
 
   rc = system(command);
+  free(command);
 
   if (resethome) { // rollback
     unsetenv("HOME");
@@ -537,6 +645,12 @@ int GetVersionControl()
   if (rc != 0)
   {
     command = GetVersionControlCommand(-1);
+    if (!command)
+    {
+      free(tmp_file_dir);
+      free(delete_tmp_dir_cmd);
+      return -1;
+    }
     systemError(__LINE__, rc, command)
     /** for user fossy
     \code git: git config --global http.proxy web-proxy.cce.hp.com:8088; git clone http://github.com/schacon/grit.git
@@ -544,29 +658,48 @@ int GetVersionControl()
     */
     LOG_FATAL("please make sure the URL of repo is correct, also add correct proxy for your version control system, command is:%s, g.temp_file is:%s, rc is:%d. \n", command, g.temp_file, rc);
     /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
-    rc_system = system(DeleteTempDirCmd);
-    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
+    rc_system = system(delete_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, delete_tmp_dir_cmd)
+    
+    free(tmp_file_dir);
+    free(delete_tmp_dir_cmd);
+    free(command);
     return 1;
   }
 
-  snprintf(command,MAXCMD-1, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", g.temp_file, TempFileDirectory);
+  if (asprintf(&command, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", g.temp_file, tmp_file_dir) == -1)
+  {
+    free(tmp_file_dir);
+    free(delete_tmp_dir_cmd);
+    return 1;
+  }
+    
+  free(tmp_file_dir);
+
   rc = system(command);
 
   if (rc != 0)
   {
-    systemError(__LINE__, rc_system, DeleteTempDirCmd)
+    systemError(__LINE__, rc, command)
     /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
-    rc_system = system(DeleteTempDirCmd);
-    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, DeleteTempDirCmd)
-    LOG_FATAL("DeleteTempDirCmd is:%s\n", DeleteTempDirCmd);
+    rc_system = system(delete_tmp_dir_cmd);
+    if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, delete_tmp_dir_cmd)
+    LOG_FATAL("DeleteTempDirCmd is:%s\n", delete_tmp_dir_cmd);
+
+    free(command);
+    free(delete_tmp_dir_cmd);
     return 1;
   }
 
+  free(command);
+
   /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
-  rc_system = system(DeleteTempDirCmd);
+  rc_system = system(delete_tmp_dir_cmd);
   if (!WIFEXITED(rc_system)) {
-    systemError(__LINE__, rc_system, DeleteTempDirCmd)
+    systemError(__LINE__, rc_system, delete_tmp_dir_cmd)
   }
+
+  free(delete_tmp_dir_cmd);
 
   return 0; // succeed to retrieve source
 }
@@ -716,58 +849,87 @@ char *PathCheck(char *DirPath)
  */
 int Archivefs(char *Path, char *TempFile, char *TempFileDir, struct stat Status)
 {
-  char CMD[MAXCMD] = {0};
+  char *cmd;
   int rc_system = 0;
 
-  snprintf(CMD,MAXCMD-1, "mkdir -p '%s' >/dev/null 2>&1", TempFileDir);
-  rc_system = system(CMD);
-  if (!WIFEXITED(rc_system))
+  if (asprintf(&cmd, "mkdir -p '%s' >/dev/null 2>&1", TempFileDir) == -1)
   {
-    LOG_FATAL("[%s:%d] Could not create temporary directory", __FILE__, __LINE__);
-    systemError(__LINE__, rc_system, CMD)
     return 0;
   }
 
+  rc_system = system(cmd);
+  if (!WIFEXITED(rc_system))
+  {
+    LOG_FATAL("[%s:%d] Could not create temporary directory", __FILE__, __LINE__);
+    systemError(__LINE__, rc_system, cmd)
+    free(cmd);
+    return 0;
+  }
+
+  free(cmd);
+
   if (S_ISDIR(Status.st_mode)) /* directory? */
   {
-    memset(CMD,'\0', MAXCMD);
-    snprintf(CMD,MAXCMD-1, "tar %s -cf  '%s' -C '%s' ./ 1>/dev/null", g.param, TempFile, Path);
-    rc_system = system(CMD);
+    if (asprintf(&cmd, "tar %s -cf  '%s' -C '%s' ./ 1>/dev/null", g.param, TempFile, Path) == -1)
+    {
+      return 0;
+    }
+    rc_system = system(cmd);
     if (!WIFEXITED(rc_system))
     {
-      systemError(__LINE__, rc_system, CMD)
+      systemError(__LINE__, rc_system, cmd)
+      free(cmd);
       return 0;
     }
+    free(cmd);
   } else if (strstr(Path, "*"))  // wildcards
   {
-    memset(CMD, '\0', MAXCMD);
+
     /* for the wildcards upload, keep the path */
     /* copy * files to TempFileDir/temp primarily */
-    snprintf(CMD,MAXCMD-1, "mkdir -p '%s/temp'  > /dev/null 2>&1 && cp -r %s '%s/temp' > /dev/null 2>&1", TempFileDir, Path, TempFileDir);
-    rc_system = system(CMD);
-    if (rc_system != 0)
+    if (asprintf(&cmd, "mkdir -p '%s/temp'  > /dev/null 2>&1 && cp -r %s '%s/temp' > /dev/null 2>&1", TempFileDir, Path, TempFileDir) == -1)
     {
-      systemError(__LINE__, rc_system, CMD)
       return 0;
     }
-    memset(CMD, '\0', MAXCMD);
-    snprintf(CMD,MAXCMD-1, "tar -cf  '%s' -C %s/temp ./  1> /dev/null && rm -rf %s/temp  > /dev/null 2>&1", TempFile, TempFileDir, TempFileDir);
-    rc_system = system(CMD);
+    rc_system = system(cmd);
     if (rc_system != 0)
     {
-      systemError(__LINE__, rc_system, CMD)
+      systemError(__LINE__, rc_system, cmd)
+      free(cmd);
       return 0;
     }
+
+    free(cmd);
+
+    if (asprintf(&cmd, "tar -cf  '%s' -C %s/temp ./  1> /dev/null && rm -rf %s/temp  > /dev/null 2>&1", TempFile, TempFileDir, TempFileDir) == -1)
+    {
+      return 0;
+    }
+    rc_system = system(cmd);
+    if (rc_system != 0)
+    {
+      systemError(__LINE__, rc_system, cmd)
+      free(cmd);
+      return 0;
+    }
+
+    free(cmd);
   } else if(S_ISREG(Status.st_mode)) /* regular file? */
   {
-    memset(CMD, '\0', MAXCMD);
-    snprintf(CMD,MAXCMD-1, "cp '%s' '%s' >/dev/null 2>&1", Path, TempFile);
-    rc_system = system(CMD);
-    if (rc_system != 0)
+
+    if (asprintf(&cmd, "cp '%s' '%s' >/dev/null 2>&1", Path, TempFile) == -1)
     {
-      systemError(__LINE__, rc_system, CMD)
       return 0;
     }
+
+    rc_system = system(cmd);
+    if (rc_system != 0)
+    {
+      systemError(__LINE__, rc_system, cmd)
+      free(cmd);
+      return 0;
+    }
+    free(cmd);
   }
 
   return 0; /* neither a directory nor a regular file */
@@ -899,7 +1061,7 @@ void replace_url_with_auth()
     token = strtok(NULL, needle);
     index++;
   }
-  snprintf(g.URL, FILEPATH, "%s%s:%s@%s", http, username, password, URI);
+  snprintf(g.URL, sizeof(g.URL)-1, "%s%s:%s@%s", http, username, password, URI);
   memset(g.param,'\0',MAXCMD);
 }
 
@@ -963,32 +1125,44 @@ char* GetVersionControlCommand(int withPassword)
 {
   char Type[][4] = {"SVN", "Git", "CVS"};
   char *command = NULL;
-  char TempFileDirectory[MAXCMD];
+  char *tmp_file_dir;
+  int ret = 0;
 
   /** save each upload files in /srv/fossology/repository/localhost/wget/wget.xxx.dir/ */
-  sprintf(TempFileDirectory, "%s.dir", g.temp_file);
+  if (asprintf(&tmp_file_dir, "%s.dir", g.temp_file) == -1)
+  {
+    return NULL;
+  }
 
-  command = (char *)malloc(MAXCMD);
-  memset(command,'\0',MAXCMD);
+  if(withPassword < 0) {
+    MaskPassword();
+  }
 
-  if(withPassword < 0) MaskPassword();
-  if (0 == strcmp(g.type, Type[0]))
+  if (strcmp(g.type, Type[0]) == 0)
   {
     if (g.proxy[0] && g.proxy[0][0])
     {
-      sprintf(command, "svn --config-option servers:global:http-proxy-host=%s --config-option servers:global:http-proxy-port=%s export %s %s %s --no-auth-cache >/dev/null 2>&1", g.proxy[4], g.proxy[5], g.URL, g.param, TempFileDirectory);
+      ret = asprintf(&command, "svn --config-option servers:global:http-proxy-host=%s --config-option servers:global:http-proxy-port=%s export %s %s %s --no-auth-cache >/dev/null 2>&1", g.proxy[4], g.proxy[5], g.URL, g.param, tmp_file_dir);
     } else {
-      sprintf(command, "svn export %s %s %s --no-auth-cache >/dev/null 2>&1", g.URL, g.param, TempFileDirectory);
+      ret = asprintf(&command, "svn export %s %s %s --no-auth-cache >/dev/null 2>&1", g.URL, g.param, tmp_file_dir);
     }
-  } else if (0 == strcmp(g.type, Type[1]))
+
+  } else if (strcmp(g.type, Type[1]) == 0)
   {
     replace_url_with_auth();
     if (g.proxy[0] && g.proxy[0][0])
     {
-      sprintf(command, "git config --global http.proxy %s && git clone %s %s %s  && rm -rf %s/.git", g.proxy[0], g.URL, g.param, TempFileDirectory, TempFileDirectory);
+      ret = asprintf(&command, "git config --global http.proxy %s && git clone %s %s %s  && rm -rf %s/.git", g.proxy[0], g.URL, g.param, tmp_file_dir, tmp_file_dir);
     } else {
-      sprintf(command, "git clone %s %s %s >/dev/null 2>&1 && rm -rf %s/.git", g.URL, g.param, TempFileDirectory, TempFileDirectory);
+      ret = asprintf(&command, "git clone %s %s %s >/dev/null 2>&1 && rm -rf %s/.git", g.URL, g.param, tmp_file_dir, tmp_file_dir);
     }
+
   }
+
+  free(tmp_file_dir);
+  if (ret == -1) {
+    return NULL;
+  }
+
   return command;
 }

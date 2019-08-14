@@ -50,7 +50,7 @@ typedef struct
 {
   long upload_key;      ///< Input for this system
   char temp_file[MAXCMD];  ///< Temp file to be used
-  char URL[MAXCMD];       ///< URL to download
+  char URL[4096];       ///< URL to download
   char type[MAXCMD];      ///< Type of download (FILE/version control)
   char param[MAXCMD];     ///< Additional parameters
   char *proxy[6];         ///< Proxy from fossology.conf
