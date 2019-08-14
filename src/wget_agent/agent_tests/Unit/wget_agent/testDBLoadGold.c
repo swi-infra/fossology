@@ -56,13 +56,13 @@ int  DBLoadGoldInit()
   pgConn = fo_dbManager_getWrappedConnection(dbManager);
 
   /** -# Set  */
-  strcpy(GlobalParam, "-l 1 -A *.list -R *.deb");
+  strcpy(g.param, "-l 1 -A *.list -R *.deb");
   strcpy(URL, "https://mirrors.kernel.org/fossology/releases/3.0.0/ubuntu/14.04/");
   strcpy(TempFileDir, "./test_result/");
   strcpy(TempFile, "./test_result/fossology.sources.list");
   GetURL(TempFile, URL, TempFileDir);
-  strcpy(GlobalTempFile,"./test_result/fossology.sources.list");
-  strcpy(GlobalURL, "https://mirrors.kernel.org/fossology/releases/3.0.0/ubuntu/14.04/");
+  strcpy(g.temp_file,"./test_result/fossology.sources.list");
+  strcpy(g.URL, "https://mirrors.kernel.org/fossology/releases/3.0.0/ubuntu/14.04/");
 
   /** -# Delete the record that upload_filename is wget.tar, pre testing */
   memset(SQL,'\0',MAXCMD);
@@ -94,7 +94,7 @@ int  DBLoadGoldInit()
     printf("Perpare upload information ERROR!\n");
     return 1;
   }
-  GlobalUploadKey = atoi(PQgetvalue(result,0,0));
+  g.upload_key = atoi(PQgetvalue(result,0,0));
   PQclear(result);
 
   GError* error = NULL;
@@ -121,9 +121,9 @@ int  DBLoadGoldInit()
  */
 int DBLoadGoldClean()
 {
-  memset(GlobalTempFile, 0, MAXCMD);
-  memset(GlobalURL, 0, MAXCMD);
-  memset(GlobalParam, 0, MAXCMD);
+  memset(g.temp_file, 0, MAXCMD);
+  memset(g.URL, 0, MAXCMD);
+  memset(g.param, 0, MAXCMD);
   char TempFileDir[MAXCMD];
 
   strcpy(TempFileDir, "./test_result");
@@ -142,7 +142,7 @@ int DBLoadGoldClean()
   }
 
   dropTestEnvironment(dbManager, AGENT_DIR, "wget_agent");
-  GlobalUploadKey = -1;
+  g.upload_key = -1;
 
   return 0;
 }
@@ -181,7 +181,7 @@ void testDBLoadGold()
   memset(SQL, 0, MAXCMD);
   PGresult *result;
   snprintf(SQL, MAXCMD-1, "select pfile_sha1, pfile_md5 from pfile where pfile_pk in (select pfile_fk from "
-      "upload where upload_pk = %ld);", GlobalUploadKey);
+      "upload where upload_pk = %ld);", g.upload_key);
   result =  PQexec(pgConn, SQL); /* SELECT */
   if (fo_checkPQresult(pgConn, result, SQL, __FILE__, __LINE__))
   {
