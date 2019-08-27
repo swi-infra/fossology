@@ -437,6 +437,8 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
      'http://a.org/file' -l 1 -R index.html*  2>&1"
    */
   LOG_VERBOSE0("CMD: %s", cmd);
+  // XXX
+  printf("DEBUG - REMOVE ME - CMD: %s", cmd);
   rc = system(cmd);
 
   if (WIFEXITED(rc) && (WEXITSTATUS(rc) != 0))
