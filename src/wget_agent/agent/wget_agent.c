@@ -521,7 +521,7 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
 int GetVersionControl()
 {
   char *command = NULL;
-  char TempFileDirectory[MAXCMD];
+  char *tmp_file_directory;
   char *delete_tmpdir_cmd;
   char *tmp_home;
 
@@ -547,10 +547,16 @@ int GetVersionControl()
   free(tmp_home);
 
   /* save each upload files in /srv/fossology/repository/localhost/wget/wget.xxx.dir/ */
-  sprintf(TempFileDirectory, "%s.dir", GlobalTempFile);
-  res = asprintf(&delete_tmpdir_cmd, "rm -rf %s", TempFileDirectory);
+  res = asprintf(&tmp_file_directory, "%s.dir", GlobalTempFile);
   if (res == -1)
   {
+    return ASPRINTF_MEM_ERROR;
+  }
+
+  res = asprintf(&delete_tmpdir_cmd, "rm -rf %s", tmp_file_directory);
+  if (res == -1)
+  {
+    free(tmp_file_directory);
     return ASPRINTF_MEM_ERROR;
   }
 
@@ -575,11 +581,13 @@ int GetVersionControl()
     /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
     rc_system = system(delete_tmpdir_cmd);
     if (!WIFEXITED(rc_system)) systemError(__LINE__, rc_system, delete_tmpdir_cmd)
+    free(tmp_file_directory);
     free(delete_tmpdir_cmd);
     return 1;
   }
 
-  snprintf(command,MAXCMD-1, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", GlobalTempFile, TempFileDirectory);
+  snprintf(command,MAXCMD-1, "tar -cf  '%s' -C '%s' ./ 1>/dev/null", GlobalTempFile, tmp_file_directory);
+  free(tmp_file_directory);
   rc = system(command);
   if (rc != 0)
   {
