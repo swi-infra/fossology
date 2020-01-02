@@ -33,7 +33,8 @@ class XpClearedGetter extends ClearedGetterCommon
   protected $getOnlyCleared;
   protected $extrawhere;
 
-  public function __construct($tableName, $type=null, $getOnlyCleared=false, $extraWhere=null) {
+  public function __construct($tableName, $type=null, $getOnlyCleared=false, $extraWhere=null)
+  {
     global $container;
 
     $this->copyrightDao = $container->get('dao.copyright');
@@ -60,7 +61,7 @@ class XpClearedGetter extends ClearedGetterCommon
     }
     $this->extrawhere .= ' agent_fk='.$latestXpAgentId;
 
-    return $this->copyrightDao->getAllEntriesReport($this->tableName, $uploadId, $uploadTreeTableName, $this->type, $this->getOnlyCleared, DecisionTypes::IDENTIFIED, $this->extrawhere);
+    return $this->copyrightDao->getAllEntriesReport($this->tableName, $uploadId, $uploadTreeTableName, $this->type, $this->getOnlyCleared, DecisionTypes::IDENTIFIED, $this->extrawhere, $groupId);
   }
 }
 
