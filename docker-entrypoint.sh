@@ -14,6 +14,7 @@ set -o errexit -o nounset -o pipefail
 
 db_host="${FOSSOLOGY_DB_HOST:-localhost}"
 db_name="${FOSSOLOGY_DB_NAME:-fossology}"
+db_port="${FOSSOLOGY_DB_PORT:-5432}"
 db_user="${FOSSOLOGY_DB_USER:-fossy}"
 db_password="${FOSSOLOGY_DB_PASSWORD:-fossy}"
 
@@ -23,6 +24,7 @@ dbname=$db_name;
 host=$db_host;
 user=$db_user;
 password=$db_password;
+port=$db_port;
 EOM
 
 sed -i 's/address = .*/address = '"${FOSSOLOGY_SCHEDULER_HOST:-localhost}"'/' \
@@ -39,7 +41,7 @@ if [[ $db_host == 'localhost' ]]; then
   /etc/init.d/postgresql start
 else
   test_for_postgres() {
-    PGPASSWORD=$db_password psql -h "$db_host" "$db_name" "$db_user" -c '\l' >/dev/null
+    PGPASSWORD=$db_password psql -h "$db_host" -p $db_port -d "$db_name" -U "$db_user" -c '\l' >/dev/null
     return $?
   }
   until test_for_postgres; do
