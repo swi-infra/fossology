@@ -173,9 +173,10 @@ class CopyrightDao
    * @param $uploadId
    * @param $type
    * @param $extrawhere
+   * @param $deleted
    * @return array $result
    */
-  public function getScannerEntries($tableName, $uploadTreeTableName, $uploadId, $type, $extrawhere)
+  public function getScannerEntries($tableName, $uploadTreeTableName, $uploadId, $type, $extrawhere, $deleted='true')
   {
     $statementName = __METHOD__.$tableName.$uploadTreeTableName;
     $params = array();
@@ -198,12 +199,17 @@ class CopyrightDao
       $statementName .= "._".$extrawhere."_";
     }
 
-    $sql = "SELECT UT.uploadtree_pk as uploadtree_pk, C.content AS content
+    if ($deleted == 'false') {
+      $statementName .= "._"."deleted";
+    }
+
+    $sql = "SELECT UT.uploadtree_pk as uploadtree_pk, C.content AS content,
+              C.hash AS hash, C.agent_fk as agent_fk
               FROM $tableName C
              INNER JOIN $uploadTreeTableName UT ON C.pfile_fk = UT.pfile_fk
              WHERE C.content IS NOT NULL
                AND C.content!=''
-               AND C.is_enabled='true'
+               AND C.is_enabled='$deleted'
                $extendWClause
              ORDER BY UT.uploadtree_pk, C.content DESC";
     $this->dbManager->prepare($statementName, $sql);
