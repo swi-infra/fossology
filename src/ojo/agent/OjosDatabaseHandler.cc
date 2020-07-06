@@ -188,6 +188,12 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
   bool success = false;
   unsigned long result = 0;
 
+  icu::UnicodeString unicodeCleanShortname = fo::recodeToUnicode(rfShortName);
+
+  // Clean shortname to get utf8 string
+  rfShortName = "";
+  unicodeCleanShortname.toUTF8String(rfShortName);
+
   fo_dbManager_PreparedStatement *searchWithOr = fo_dbManager_PrepareStamement(
       dbManager.getStruct_dbManager(),
       "selectLicenseIdWithOrOJO",
@@ -214,11 +220,11 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
     /* Remove last occurrence of + and -or-later (if found) */
     if (plusLast != string::npos)
     {
-      tempShortName.replace(plusLast, plus.length(), "");
+      tempShortName.erase(plusLast, string::npos);
     }
     if (orLaterLast != string::npos)
     {
-      tempShortName.replace(orLaterLast, orLater.length(), "");
+      tempShortName.erase(orLaterLast, string::npos);
     }
 
     QueryResult queryResult = dbManager.execPrepared(searchWithOr,
@@ -243,7 +249,7 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
     /* Remove last occurrence of -only (if found) */
     if (onlyLast != string::npos)
     {
-      tempShortName.replace(onlyLast, only.length(), "");
+      tempShortName.erase(onlyLast, string::npos);
     }
 
     QueryResult queryResult = dbManager.execPrepared(searchWithOr,
