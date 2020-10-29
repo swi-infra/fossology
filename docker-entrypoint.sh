@@ -55,6 +55,29 @@ if [[ $# -eq 0 || ($# -eq 1 && "$1" == "scheduler") ]]; then
   /usr/local/lib/fossology/fo-postinstall --common --database --licenseref
 fi
 
+function psqlQuery {
+  psql -U $db_user -h $db_host -p $db_port -d $db_name "$@"
+}
+
+check_schema_in_license_ref_table() {
+  local status
+  status=$(psqlQuery -c "SELECT column_name,col_description(table_name::regclass, ordinal_position) AS description \
+                         FROM information_schema.columns \
+                         WHERE table_schema = 'public' \
+                         AND table_name = 'license_ref' \
+                         AND udt_name = 'bit' \
+                         AND col_description(table_name::regclass, ordinal_position) IS NULL")
+
+  if ! echo "$status" | grep "(0 rows)"; then
+    echo "license_ref table was corrupted"
+    echo "Trying to recover ..."
+    /usr/local/lib/fossology/fo-postinstall
+  fi
+}
+
+echo "check_schema_in_license_ref_table"
+check_schema_in_license_ref_table
+
 # Start Fossology
 echo
 echo 'Fossology initialisation complete; Starting up...'
