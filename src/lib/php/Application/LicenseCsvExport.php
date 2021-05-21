@@ -84,7 +84,7 @@ SELECT DISTINCT ON(rf_pk) * FROM
   ONLY license_ref
   NATURAL FULL JOIN marydoneCand)
 SELECT
-  rf.rf_shortname, rf.rf_fullname, rf.rf_text, rc.rf_shortname parent_shortname,
+  rf.rf_shortname, rf.rf_licensetype, rf.rf_fullname, rf.rf_text, rc.rf_shortname parent_shortname,
   rr.rf_shortname report_shortname, rf.rf_url, rf.rf_notes, rf.rf_source,
   rf.rf_risk, gp.group_name
 FROM allLicenses AS rf
@@ -113,7 +113,7 @@ WHERE rf.rf_detector_type=$1";
     $out = fopen('php://output', 'w');
     ob_start();
     $head = array(
-      'shortname', 'fullname', 'text', 'parent_shortname', 'report_shortname',
+        'shortname', 'licensetype', 'fullname', 'text', 'parent_shortname', 'report_shortname',
       'url', 'notes', 'source', 'risk', 'group');
     fputcsv($out, $head, $this->delimiter, $this->enclosure);
     foreach ($vars as $row) {

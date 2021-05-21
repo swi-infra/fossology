@@ -12,6 +12,7 @@ DIRS = \
 	adj2nest \
 	buckets \
 	cli \
+	compatibility \
 	copyright \
 	debug \
 	decider \

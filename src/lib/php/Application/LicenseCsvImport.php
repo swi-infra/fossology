@@ -59,6 +59,7 @@ class LicenseCsvImport
    * Alias for headers */
   protected $alias = array(
       'shortname'=>array('shortname','Short Name'),
+      'licensetype'=>array('licensetype','License Type'),
       'fullname'=>array('fullname','Long Name'),
       'text'=>array('text','Full Text'),
       'parent_shortname'=>array('parent_shortname','Decider Short Name'),
@@ -148,7 +149,7 @@ class LicenseCsvImport
     }
     foreach (array('parent_shortname' => null, 'report_shortname' => null,
       'url' => '', 'notes' => '', 'source' => '', 'risk' => 0,
-      'group' => null) as $optNeedle=>$defaultValue) {
+      'group' => null, 'licensetype' => "Permisssive") as $optNeedle=>$defaultValue) {
       $mRow[$optNeedle] = $defaultValue;
       if ($this->headrow[$optNeedle]!==false && array_key_exists($this->headrow[$optNeedle], $row)) {
         $mRow[$optNeedle] = $row[$this->headrow[$optNeedle]];
@@ -175,7 +176,7 @@ class LicenseCsvImport
       $headrow[$needle] = $col;
     }
     foreach (array('parent_shortname', 'report_shortname', 'url', 'notes',
-      'source', 'risk', 'group') as $optNeedle) {
+      'source', 'risk', 'group','licensetype') as $optNeedle) {
       $headrow[$optNeedle] = ArrayOperation::multiSearch($this->alias[$optNeedle], $row);
     }
     return $headrow;
@@ -191,8 +192,8 @@ class LicenseCsvImport
   {
     $stmt = __METHOD__ . '.getOldLicense';
     $oldLicense = $this->dbManager->getSingleRow('SELECT ' .
-      'rf_shortname, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
-      'FROM license_ref WHERE rf_pk = $1', array($rfPk), $stmt);
+      'rf_shortname, rf_licensetype, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
+        'FROM license_ref WHERE rf_pk = $1', array($rfPk), $stmt);        // rf_licensetype,
 
     $stmt = __METHOD__ . '.getOldMapping';
     $sql = 'SELECT rf_parent FROM license_map WHERE rf_fk = $1 AND usage = $2;';
@@ -261,6 +262,12 @@ class LicenseCsvImport
       $stmt .= '.updRisk';
       $extraParams[] = "rf_risk=$".count($param);
       $log .= ', updated the risk level';
+    }
+    if (!empty($row['licensetype']) && $row['licensetype'] != $oldLicense['rf_licensetype']) {
+      $param[] = $row['licensetype'];
+      $stmt .= '.types';
+      $extraParams[] = "rf_licensetype=$".count($param);
+      $log .= ', updated the licensetype';
     }
     if (count($param) > 1) {
       $sql .= join(",", $extraParams);
@@ -438,6 +445,7 @@ class LicenseCsvImport
     $stmtInsert = __METHOD__ . '.insert.' . $tableName;
     $columns = array(
       "rf_shortname" => $row['shortname'],
+      "rf_licensetype" => $row['licensetype'],
       "rf_fullname"  => $row['fullname'],
       "rf_text"      => $row['text'],
       "rf_md5"       => md5($row['text']),

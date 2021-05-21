@@ -177,6 +177,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
 
     $singleRowA = array(
       'rf_shortname' => 'licA',
+      'rf_licensetype' => 'lictypeA',
       'rf_fullname' => 'licennnseA',
       'rf_text' => 'someRandom',
       'rf_md5' => md5('someRandom'),
@@ -188,7 +189,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     );
     $dbManager->shouldReceive('getSingleRow')
       ->with(
-      'SELECT rf_shortname, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
+      'SELECT rf_shortname, rf_licensetype, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
       'FROM license_ref WHERE rf_pk = $1', array(101), anything())
       ->once()
       ->andReturn($singleRowA);
@@ -202,6 +203,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
       ->once();
     $singleRowB = $singleRowA;
     $singleRowB["rf_shortname"] = "licB";
+    $singleRowB["rf_licensetype"] = "lictypeB";
     $singleRowB["rf_fullname"] = "liceB";
     $singleRowB["rf_text"] = "txB";
     $singleRowB["rf_md5"] = md5("txB");
@@ -210,6 +212,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnB = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licB',
+        'licensetype' => 'lictypeB',
         'fullname' => 'liceB',
         'text' => 'txB',
         'url' => '',
@@ -225,6 +228,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     // Test for licF insert
     $singleRowF = $singleRowA;
     $singleRowF["rf_shortname"] = "licF";
+    $singleRowF["rf_licensetype"] = "lictypeF";
     $singleRowF["rf_fullname"] = "liceF";
     $singleRowF["rf_text"] = "txF";
     $singleRowF["rf_md5"] = md5("txF");
@@ -241,6 +245,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnF = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licF',
+        'licensetype' => 'lictypeF',
         'fullname' => 'liceF',
         'text' => 'txF',
         'url' => '',
@@ -256,6 +261,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     // Test licC insert
     $singleRowC = $singleRowA;
     $singleRowC["rf_shortname"] = "licC";
+    $singleRowC["rf_licensetype"] = "lictypeC";
     $singleRowC["rf_fullname"] = "liceC";
     $singleRowC["rf_text"] = "txC";
     $singleRowC["rf_md5"] = md5("txC");
@@ -264,6 +270,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnC = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licC',
+        'licensetype' => 'lictypeC',
         'fullname' => 'liceC',
         'text' => 'txC',
         'url' => '',
@@ -279,13 +286,14 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     // Test canlicC update
     $canLicA = $singleRowA;
     $canLicA["rf_shortname"] = "canLicA";
+    $canLicA["rf_licensetype"] = "canLicTypeA";
     $canLicA["rf_fullname"] = "canLiceA";
     $canLicA["rf_text"] = "txcan";
     $canLicA["rf_risk"] = 0;
     $canLicA["rf_group"] = 4;
     $dbManager->shouldReceive('getSingleRow')
     ->with(
-      'SELECT rf_shortname, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
+      'SELECT rf_shortname, rf_licensetype, rf_fullname, rf_text, rf_url, rf_notes, rf_source, rf_risk ' .
       'FROM license_ref WHERE rf_pk = $1', array(200), anything())
       ->once()
       ->andReturn($canLicA);
@@ -306,6 +314,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnC = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'canLicA',
+        'licensetype' => 'canLicTypeA',
         'fullname' => 'canDidateLicenseA',
         'text' => 'Text of candidate license',
         'url' => '', 'notes' => '', 'source' => '', 'risk' => 0,
@@ -334,6 +343,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnA = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licA',
+        'licensetype' => 'lictypeA',
         'fullname' => 'liceB',
         'text' => 'txA',
         'url' => '',
@@ -352,6 +362,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnE = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licE',
+        'licensetype' => 'lictypeE',
         'fullname' => 'liceE',
         'text' => 'txD',
         'url' => '',
@@ -369,6 +380,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnG = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'licG',
+        'licensetype' => 'lictypeG',
         'fullname' => 'liceG',
         'text' => 'txD',
         'url' => '',
@@ -385,6 +397,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     // Test canlicB insert
     $canlicB = $singleRowA;
     $canlicB["rf_shortname"] = "canLicB";
+    $canlicB["rf_licensetype"] = "canLicTypeB";
     $canlicB["rf_fullname"] = "canLiceB";
     $canlicB["rf_text"] = "txCan";
     $canlicB["rf_md5"] = md5("txCan");
@@ -400,6 +413,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $returnC = Reflectory::invokeObjectsMethodnameWith($licenseCsvImport,
       'handleCsvLicense', array(array(
         'shortname' => 'canLicB',
+        'licensetype' => 'canLicTypeB',
         'fullname' => 'canLiceB',
         'text' => 'txCan',
         'url' => '',
@@ -433,25 +447,25 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     assertThat(
       Reflectory::invokeObjectsMethodnameWith($licenseCsvImport, 'handleHeadCsv',
         array(array(
-          'shortname', 'foo', 'text', 'fullname', 'notes', 'bar'
+            'shortname', 'foo', 'text', 'fullname', 'notes', 'bar', 'licensetype'
         ))),
       is(array(
         'shortname' => 0, 'fullname' => 3, 'text' => 2,
         'parent_shortname' => false, 'report_shortname' => false,
         'url' => false, 'notes' => 4, 'source' => false, 'risk' => 0,
-        'group' => false
+        'group' => false,'licensetype' => 6
       )));
 
     assertThat(
       Reflectory::invokeObjectsMethodnameWith($licenseCsvImport, 'handleHeadCsv',
         array(array(
           'Short Name', 'URL', 'text', 'fullname', 'notes', 'Foreign ID',
-          'License group'
+          'License group', 'License Type'
         ))),
       is(array(
         'shortname' => 0, 'fullname' => 3, 'text' => 2,
         'parent_shortname' => false, 'report_shortname' => false, 'url' => 1,
-        'notes' => 4, 'source' => 5, 'risk' => false, 'group' => 6
+        'notes' => 4, 'source' => 5, 'risk' => false, 'group' => 6, 'licensetype' => 7
       )));
   }
 
@@ -529,7 +543,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
     $licenseCsvImport = new LicenseCsvImport($dbManager, $userDao);
 
     Reflectory::invokeObjectsMethodnameWith($licenseCsvImport, 'handleCsv',
-      array(array('shortname', 'foo', 'text', 'fullname', 'notes')));
+      array(array('shortname','licensetype', 'foo', 'text', 'fullname', 'notes')));
     assertThat(Reflectory::getObjectsProperty($licenseCsvImport, 'headrow'),
       is(notNullValue()));
 
@@ -540,6 +554,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
       ->andReturn(false);
     $licenseRow = array(
       "rf_shortname" => "licA",
+      "rf_licensetype" => "lictypeA",
       "rf_fullname" => "liceA",
       "rf_text" => "txA",
       "rf_md5" => md5("txA"),
@@ -557,7 +572,7 @@ class LicenseCsvImportTest extends \PHPUnit\Framework\TestCase
         md5('txA') => false
     ));
     Reflectory::invokeObjectsMethodnameWith($licenseCsvImport, 'handleCsv',
-      array(array('licA', 'bar', 'txA', 'liceA', 'noteA')));
+      array(array('licA', 'lictypeA', 'bar', 'txA', 'liceA', 'noteA')));
     assertThat(Reflectory::getObjectsProperty($licenseCsvImport, 'nkMap'),
       is(array('licA' => 101)));
     assertThat(Reflectory::getObjectsProperty($licenseCsvImport, 'mdkMap'),

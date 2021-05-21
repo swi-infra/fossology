@@ -108,6 +108,12 @@ without any warranty.
             <argument type="service" id="db.manager"/>
             <argument type="service" id="logger"/>
         </service>
+        <service id="dao.compatibility" class="Fossology\Lib\Dao\CompatibilityDao">
+            <argument type="service" id="db.manager"/>
+            <argument type="service" id="logger"/>
+            <argument type="service" id="dao.license"/>
+            <argument type="service" id="dao.agent"/>
+        </service>
 
         <service id="event.types" class="Fossology\Lib\Data\Clearing\ClearingEventTypes">
         </service>
@@ -160,7 +166,17 @@ without any warranty.
             <argument type="service" id="db.manager"/>
             <argument type="service" id="dao.user"/>
         </service>
+        
+        <service id="app.license_yaml_import" class="Fossology\Lib\Application\LicenseCompatibilityRulesYamlImport">
+            <argument type="service" id="db.manager"/>
+            <argument type="service" id="dao.user"/>
+            <argument type="service" id="dao.license"/>
+        </service>
 
+        <service id="app.users_csv_import" class="Fossology\Lib\Application\UsersCsvImport">
+            <argument type="service" id="db.manager"/>
+        </service>
+    
         <service id="app.obligation_csv_import" class="Fossology\Lib\Application\ObligationCsvImport">
             <argument type="service" id="db.manager"/>
         </service>

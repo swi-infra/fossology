@@ -71,6 +71,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       $licenses[$i] = array(
         'rf_pk' => $i,
         'rf_shortname' => 'lic' . $i,
+        'rf_licensetype' => 'lictype' . $i,
         'rf_fullname' => 'lice' . $i,
         'rf_text' => 'text' . $i,
         'rf_url' => $i . $i,
@@ -85,6 +86,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       $candLicenses[$i] = array(
         'rf_pk' => $i + 4,
         'rf_shortname' => 'candlic' . $i,
+        'rf_licensetype' => 'lictype' . $i,
         'rf_fullname' => 'candlice' . $i,
         'rf_text' => 'text' . $i,
         'rf_url' => $i . $i,
@@ -105,13 +107,14 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
     $dbManager->insertTableRow('license_map', array('rf_fk'=>3,'rf_parent'=>2,'usage'=>LicenseMap::REPORT));
 
     $licenseCsvExport = new LicenseCsvExport($dbManager);
-    $head = array('shortname','fullname','text','parent_shortname','report_shortname','url','notes','source','risk','group');
+    $head = array('shortname','licensetype','fullname','text','parent_shortname','report_shortname','url','notes','source','risk','group');
     $out = fopen('php://output', 'w');
 
     $csv = $licenseCsvExport->createCsv();
     ob_start();
     fputcsv($out, $head);
     fputcsv($out, array($licenses[1]['rf_shortname'],
+        $licenses[1]['rf_licensetype'],
         $licenses[1]['rf_fullname'],
         $licenses[1]['rf_text'],
         null,
@@ -123,6 +126,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         null));
 
     fputcsv($out, array($licenses[2]['rf_shortname'],
+        $licenses[2]['rf_licensetype'],
         $licenses[2]['rf_fullname'],
         $licenses[2]['rf_text'],
         null,
@@ -134,6 +138,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         null));
 
     fputcsv($out, array($licenses[3]['rf_shortname'],
+        $licenses[3]['rf_licensetype'],
         $licenses[3]['rf_fullname'],
         $licenses[3]['rf_text'],
         $licenses[1]['rf_shortname'],
@@ -145,6 +150,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         null));
 
     fputcsv($out, array($candLicenses[2]['rf_shortname'],
+      $candLicenses[2]['rf_licensetype'],
       $candLicenses[2]['rf_fullname'],
       $candLicenses[2]['rf_text'],
       null,
@@ -156,6 +162,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       "test"));
 
     fputcsv($out, array($candLicenses[4]['rf_shortname'],
+      $candLicenses[4]['rf_licensetype'],
       $candLicenses[4]['rf_fullname'],
       $candLicenses[4]['rf_text'],
       null,
@@ -176,6 +183,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
     ob_start();
     fputcsv($out, $head, $delimiter);
     fputcsv($out, array($licenses[3]['rf_shortname'],
+          $licenses[3]['rf_licensetype'],
           $licenses[3]['rf_fullname'],
           $licenses[3]['rf_text'],
           $licenses[1]['rf_shortname'],

@@ -27,6 +27,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 namespace fo
 {
   unsigned long stringToUnsignedLong(const char* string);
+  bool stringToBool(const char* string);
   icu::UnicodeString recodeToUnicode(const std::string &input);
 }
 
