@@ -79,7 +79,7 @@ namespace Fossology\UI\Api\Test\Models
         ]);
       self::$functions->shouldReceive('register_plugin')
         ->with(\Hamcrest\Matchers::identicalTo(
-          new ScanOptions(null, null, null)));
+          new ScanOptions(null, null, null, null)));
     }
 
     /**
@@ -142,7 +142,9 @@ namespace Fossology\UI\Api\Test\Models
       $decider->setOjoDecider(true);
       $decider->setNomosMonk(true);
 
-      $scanOption = new ScanOptions($analysis, $reuse, $decider);
+      $scancode = new Scancode();
+
+      $scanOption = new ScanOptions($analysis, $reuse, $decider, $scancode);
 
       $this->userDao->shouldReceive('getGroupIdByName')
         ->withArgs([$groupName])->andReturn($groupId);
