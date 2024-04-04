@@ -1,23 +1,15 @@
 <?php
 /*
- Copyright (C) 2017, Siemens AG
+ SPDX-FileCopyrightText: © 2017 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
+use Fossology\Lib\Data\Package\ComponentType;
 use PhpOffice\PhpWord\Element\Section;
-use \PhpOffice\PhpWord\Style;
+use PhpOffice\PhpWord\Style;
+use PhpOffice\PhpWord\SimpleType\JcTable;
+use PhpOffice\PhpWord\Style\Table;
 
 /**
  * @class ReportSummary
@@ -36,7 +28,9 @@ class ReportSummary
   private $tablestyle = array("borderSize" => 2,
                               "name" => "Arial",
                               "borderColor" => "000000",
-                              "cellSpacing" => 5
+                              "cellSpacing" => 5,
+                              "alignment"   => JcTable::START,
+                              "layout"      => Table::LAYOUT_FIXED
                              );
 
   /** @var array $subHeadingStyle
@@ -60,6 +54,7 @@ class ReportSummary
    */
   private function accumulateLicenses($licenses)
   {
+    $allOtherLicenses = "";
     if (!empty($licenses)) {
       $licenses = array_unique(array_column($licenses, 'content'));
       foreach ($licenses as $otherLicenses) {
@@ -82,8 +77,9 @@ class ReportSummary
    * @param int $timestamp
    * @param string $groupName
    * @param string $packageUri
+   * @param $assignedToUserName
    */
-  function summaryTable(Section $section, $uploadId, $userName, $mainLicenses, $licenses, $histLicenses, $otherStatement, $timestamp, $groupName, $packageUri)
+  function summaryTable(Section $section, $uploadId, $userName, $mainLicenses, $licenses, $histLicenses, $otherStatement, $timestamp, $groupName, $packageUri, $assignedToUserName)
   {
     $cellRowContinue = array("vMerge" => "continue");
     $firstRowStyle = array("size" => 14, "bold" => true);
@@ -101,6 +97,7 @@ class ReportSummary
     $allMainLicenses = $this->accumulateLicenses($mainLicenses);
     $allOtherLicenses = $this->accumulateLicenses($licenses);
 
+    $allHistLicenses = "";
     if (!empty($histLicenses)) {
       foreach ($histLicenses as $histLicense) {
         $allHistLicenses .= $histLicense["licenseShortname"].", ";
@@ -118,13 +115,19 @@ class ReportSummary
     $table->addRow($rowWidth);
     $table->addCell($cellFirstLen, $cellRowSpan)->addText(htmlspecialchars(" Clearing Information"), $firstRowStyle, "pStyle");
     $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Department"), $firstRowStyle1, "pStyle");
-    $table->addCell($cellThirdLen)->addText(htmlspecialchars(" FOSSology Generation"), null, "pStyle");
+    $table->addCell($cellThirdLen)->addText(htmlspecialchars($otherStatement['ri_department']), null, "pStyle");
 
     $table->addRow($rowWidth);
     $table->addCell($cellFirstLen, $cellRowContinue);
-    $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Prepared by"), $firstRowStyle1, "pStyle");
-    $table->addCell($cellThirdLen)->addText(htmlspecialchars(" "
-      .date("Y/m/d", $timestamp)."  ".$userName." (".$groupName.") "), null, "pStyle");
+    $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Report Created by"), $firstRowStyle1, "pStyle");
+    $table->addCell($cellThirdLen)->addText(htmlspecialchars(
+      date("Y/m/d", $timestamp)."  ".$userName." (".$groupName.") "), null, "pStyle");
+
+    $table->addRow($rowWidth);
+    $table->addCell($cellFirstLen, $cellRowContinue);
+    $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Analyzed by"),$firstRowStyle1, "pStyle");
+    $table->addCell($cellThirdLen)->addText(htmlspecialchars($assignedToUserName), null, "pStyle");
+
     $table->addRow($rowWidth);
     $table->addCell($cellFirstLen, $cellRowContinue);
     $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Reviewed by (opt.)"),$firstRowStyle1, "pStyle");
@@ -177,6 +180,28 @@ class ReportSummary
       $table->addCell($cellThirdLen)->addText(htmlspecialchars($newSw360Component["Release date"]), null, "pStyle");
     } else {
       $table->addCell($cellThirdLen)->addText(htmlspecialchars($otherStatement['ri_release_date']), null, "pStyle");
+    }
+
+    $table->addRow($rowWidth);
+    $table->addCell($cellFirstLen, $cellRowContinue);
+    $table->addCell($cellSecondLen)->addText(htmlspecialchars(" Component Id"), $firstRowStyle1, "pStyle");
+
+    if (!empty($newSw360Component["Component Id"])) {
+      $table->addCell($cellThirdLen)->addText(htmlspecialchars($newSw360Component["Component Id"]), null, "pStyle");
+    } else {
+      if (
+        empty($otherStatement['ri_component_id']) ||
+        $otherStatement['ri_component_id'] == "NA"
+      ) {
+        $componentType = "";
+      } else {
+        $componentType = ComponentType::TYPE_MAP[
+          $otherStatement['ri_component_type']
+        ] . ": ";
+      }
+      $table->addCell($cellThirdLen)->addText(
+        $componentType . htmlspecialchars($otherStatement['ri_component_id']),
+        null, "pStyle");
     }
 
     $table->addRow($rowWidth);

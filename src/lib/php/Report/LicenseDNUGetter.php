@@ -1,31 +1,21 @@
 <?php
 /*
- Copyright (C) 2020, Siemens AG
+ SPDX-FileCopyrightText: © 2020 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\Report;
 
 use Fossology\Lib\Dao\ClearingDao;
+use Fossology\Lib\Data\LicenseRef;
 
 class LicenseDNUGetter extends ClearedGetterCommon
 {
-  /** @var ClearingDao */
+  /** @var ClearingDao $clearingDao */
   private $clearingDao;
 
-  /** @var DNUFilesOnly */
+  /** @var bool $DNUFilesOnly */
   private $DNUFilesOnly;
 
   public function __construct($DNUFilesOnly=true)
@@ -49,10 +39,10 @@ class LicenseDNUGetter extends ClearedGetterCommon
 
   /**
    * @overwrite
-   * @param type $ungrupedStatements
-   * @return type
+   * @param array $ungrupedStatements
+   * @return array
    */
-  protected function groupStatements($ungrupedStatements, $extended, $agentcall, $isUnifiedReport)
+  protected function groupStatements($ungrupedStatements, $extended, $agentcall, $isUnifiedReport, $objectAgent)
   {
     $statements = array();
     foreach ($ungrupedStatements as $statement) {
@@ -60,7 +50,8 @@ class LicenseDNUGetter extends ClearedGetterCommon
       $dirName = dirname($statement['fileName']);
       $baseName = basename($statement['fileName']);
       $comment = $statement['comment'];
-      $licenseName = $statement['shortname'];
+      $licenseName = LicenseRef::convertToSpdxId($statement['shortname'],
+        $statement['spdx_id']);
       if ($this->DNUFilesOnly) {
         if (array_key_exists($fileName, $statements)) {
           $currentLics = &$statements[$fileName]["licenses"];
@@ -71,6 +62,7 @@ class LicenseDNUGetter extends ClearedGetterCommon
           $statements[$fileName] = array(
             "content" => convertToUTF8($dirName, false),
             "fileName" => $baseName,
+            "fullPath" => convertToUTF8($fileName, false),
             "licenses" => array($licenseName)
             );
         }
@@ -83,6 +75,7 @@ class LicenseDNUGetter extends ClearedGetterCommon
           );
         }
       }
+      $objectAgent->heartbeat(1);
     }
     return array("statements" => array_values($statements));
   }

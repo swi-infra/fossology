@@ -1,21 +1,10 @@
 #!/usr/bin/php
 <?php
-/***********************************************************
- Copyright (C) 2011-2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011-2012 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**************************************************************
  runBuild v2.0
@@ -80,7 +69,7 @@ for ($i = 1;$i < $argc;$i++) {
       return (0);
     case '-V':
       $i++;
-      $Version = $argv[$i];
+      $Version = escapeshellarg($argv[$i]);
       break;  
     case '-t':
       $Trunk = 1;
@@ -200,5 +189,3 @@ for ($i = 1;$i < $argc;$i++) {
 # useful but let's skip it for now
 #  system("svn commit /home/build/pb/fossology/trunk/fossology/src/testing/dataFiles/pkginstall/debian.ini /home/build/pb/fossology/trunk/fossology/src/testing/dataFiles/pkginstall/ubuntu.ini /home/build/pb/fossology/trunk/fossology/src/testing/dataFiles/pkginstall/redhat.ini /home/build/pb/fossology/trunk/fossology/src/testing/dataFiles/pkginstall/fedora.ini -m 'New $Version changes to conf files for package testing'");
   return (0);
-?>
-

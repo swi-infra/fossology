@@ -1,20 +1,9 @@
-/* **************************************************************
- Copyright (C) 2011 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015, 2018 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2011 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015, 2018 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-************************************************************** */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * \file libfodbreposysconf.c
  * \brief api for db, sysconfig, repo.
@@ -173,8 +162,8 @@ int create_db_repo_sysconf(int type, char* agent_name, char* sysconfdir) {
     return 1;
   }
 #endif
-
-  const char INIT_CMD[] = "../../../testing/db/createTestDB.php";
+#define CREATEDB TESTDBDIR "/createTestDB.php"
+  const char INIT_CMD[] = CREATEDB;
   char *CMD, *tmp;
 
   CMD = (char *)malloc(strlen(INIT_CMD) + 1);
@@ -238,7 +227,7 @@ int create_db_repo_sysconf(int type, char* agent_name, char* sysconfdir) {
 void drop_db_repo_sysconf(char* DBName) {
   char CMD[ARRAY_LENGTH];
   memset(CMD, '\0', sizeof(CMD));
-  sprintf(CMD, "../../../testing/db/createTestDB.php -d %s", DBName);
+  sprintf(CMD, "%s/createTestDB.php -d %s", TESTDBDIR, DBName);
   command_output(CMD);
 #ifdef TEST
   printf("remove DBName is:%s\n", DBName);
@@ -364,7 +353,7 @@ char *createTestConfDir(char* cwd, char* agentName)
 
   sprintf(confDir, "%s/testconf", cwd);
   sprintf(confFile, "%s/fossology.conf", confDir);
-  sprintf(agentDir, "%s/../..", cwd);
+  sprintf(agentDir, "%s/..", cwd);
 
   if (stat(confDir, &st) == -1)
   {
@@ -396,11 +385,11 @@ char *createTestConfDir(char* cwd, char* agentName)
   fclose(testConfFile);
 
   memset(CMD, '\0', sizeof(CMD));
-  sprintf(CMD, "install -D %s/../../../../VERSION %s/VERSION", cwd, confDir);
+  sprintf(CMD, "install -D %s/../VERSION %s/VERSION", cwd, confDir);
   rc = system(CMD);
 
   memset(CMD, '\0', sizeof(CMD));
-  sprintf(CMD, "install -D %s/../../../../install/defconf/Db.conf %s/Db.conf", cwd, confDir);
+  sprintf(CMD, "install -D %s/../../../install/gen/Db.conf %s/Db.conf", cwd, confDir);
   rc = system(CMD);
 
   memset(CMD, '\0', sizeof(CMD));

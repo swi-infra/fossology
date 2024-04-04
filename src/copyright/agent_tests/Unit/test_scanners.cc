@@ -1,19 +1,8 @@
-/*********************************************************************
-Copyright (C) 2014-2015, 2018 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2014-15, 2018 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*********************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
@@ -51,6 +40,10 @@ const char testContent[] = "© 2007 Hugh Jackman\n\n"
   "if (c) { return -1 } \n\n"
   "Written by: me, myself and Irene.\n\n"
   "Authors all the people at ABC\n\n"
+  "<author>Author1</author>"
+  "<head>All the people</head>"
+  "<author>Author1 Author2 Author3</author>"
+  "<author>Author4</author><b>example</b>"
   "Apache\n\n"
   "This file is protected under pants 1 , 2 ,3\n\n"
   "Do not modify this document\n\n"
@@ -59,12 +52,14 @@ const char testContent[] = "© 2007 Hugh Jackman\n\n"
   "maintained by benjamin drieu <benj@debian.org>\n\n"
   "* Copyright (c) 1989, 1993\n" // Really just one newline here!
   "* The Regents of the University of California. All rights reserved.\n\n"
-  "to be licensed as a whole";
+  "to be licensed as a whole"
+  "/* Most of the following tests are stolen from RCS 5.7's src/conf.sh.  */";
 
 class scannerTestSuite : public CPPUNIT_NS :: TestFixture {
   CPPUNIT_TEST_SUITE (scannerTestSuite);
   CPPUNIT_TEST (copyscannerTest);
   CPPUNIT_TEST (regAuthorTest);
+  CPPUNIT_TEST (regIpraTest);
   CPPUNIT_TEST (regEccTest);
   CPPUNIT_TEST (regUrlTest);
   CPPUNIT_TEST (regEmailTest);
@@ -135,8 +130,23 @@ protected:
     scannerTest(sc, testContent, "author", {
       "Written by: me, myself and Irene.",
       "Authors all the people at ABC",
+      "Author1",
+      "Author1 Author2 Author3",
+      "Author4",
       "maintained by benjamin drieu <benj@debian.org>"
     });
+  }
+
+  /**
+   * \brief Test Ipra scanner
+   * \test
+   * -# Create a Ipra scanner
+   * -# Load test data and expected data
+   * -# Test using scannerTest()
+   */
+  void regIpraTest () {
+    regexScanner sc("ipra", "ipra");
+    scannerTest(sc, testContent, "ipra", { "US patents 1 , 2 ,3" });
   }
 
   /**
@@ -184,7 +194,7 @@ protected:
    */
   void regKeywordTest () {
     regexScanner sc("keyword", "keyword");
-    scannerTest(sc, testContent, "keyword", {"patent", "licensed as"});
+    scannerTest(sc, testContent, "keyword", {"patent", "licensed as", "stolen from"});
   }
 
   /**

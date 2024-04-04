@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2011 Hewlett-Packard Development Company, L.P.
- * Copyright (C) 2015, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2011 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
 use Fossology\Lib\Data\Highlight;
@@ -174,7 +163,7 @@ class ui_view extends FO_Plugin
    * \brief Given a file handle, display "strings" of the file.
    */
   function getText($inputFile, $startOffset, $Flowed, $outputLength = -1,
-    $splitPositions = null, $insertBacklink = false)
+    $splitPositions = null, $insertBacklink = false, $fromRest = false)
   {
     if (! ($outputLength = $this->checkAndPrepare($inputFile, $startOffset,
       $outputLength))) {
@@ -182,7 +171,7 @@ class ui_view extends FO_Plugin
     }
 
     $output = "";
-    $output .= ($Flowed ? '<div class="text">' : '<div class="mono"><pre>');
+    $output .= ($Flowed ? '<div class="text">' : '<div class="mono"><pre style="overflow:unset;">');
 
     fseek($inputFile, $startOffset, SEEK_SET);
     $textFragment = new TextFragment($startOffset,
@@ -194,7 +183,7 @@ class ui_view extends FO_Plugin
     $output .= ($Flowed ? nl2br($renderedText) : $renderedText) .
       (! $Flowed ? "</pre>" : "") . "</div>\n";
 
-    return $output;
+    return $fromRest ? $renderedText : $output;
   } // ShowText()
 
   /**
@@ -287,15 +276,14 @@ class ui_view extends FO_Plugin
    *
    * @param resource $inputFile
    * @param string $BackMod
-   * @param int $ShowMenu
    * @param int $ShowHeader
-   * @param null $ShowText
-   * @param bool $ViewOnly
-   * @param bool $DispView
+   * @param $ShowText
    * @param Highlight[] $highlightEntries
    * @param bool $insertBacklink
+   * @param bool $getPageMenuInline
    *
    * \note This function is intended to be called from other plugins.
+   * @return array|string|string[]
    */
   function getView($inputFile = null, $BackMod = "browse", $ShowHeader = 1, $ShowText = null,
     $highlightEntries = array(), $insertBacklink = false, $getPageMenuInline = false)

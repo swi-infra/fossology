@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2011-2013 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011-2013 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Symfony\Component\HttpFoundation\Session\Session;
@@ -186,7 +175,6 @@ class core_smauth extends FO_Plugin
         if (pg_num_rows($result) < 1) {
           $BucketPool = 'null';       //didn't exist in bucketpool table, set it 'null'
         }
-        pg_free_result($result);
       } else {
         /* if didn't define bucketpool from sycconf.And only a single bucketpool record, get bucketpool from bucketpool table. If more than one, set it null*/
         $sql = "SELECT bucketpool_pk FROM bucketpool;";
@@ -200,8 +188,8 @@ class core_smauth extends FO_Plugin
         } else {
           $BucketPool = 'null';
         }
-        pg_free_result($result);
       }
+      pg_free_result($result);
     } else {
       pg_free_result($result);
     }
@@ -324,7 +312,7 @@ class core_smauth extends FO_Plugin
       $_SESSION['UserEmail'] = NULL;
       $_SESSION['Folder'] = NULL;
       $_SESSION['UiPref'] = NULL;
-      $Uri = Traceback_uri() . "logout.html?" . rand();
+      $Uri = Traceback_uri() . "logout.html?" . random_int(0, getrandmax());
       //$Uri = Traceback_uri() . "?mod=refresh&remod=default";
       $V.= "<script language='javascript'>\n";
       $V.= "window.open('$Uri','_top');\n";

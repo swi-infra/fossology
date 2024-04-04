@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
+/*
  db_postgres.h.php
- Copyright (C) 2007 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2007 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * routines that should be useful for programs manipulating Freshmeat
@@ -85,10 +74,10 @@ function get_entry($in_handle, $marker){
   while( false != ($line = fgets($in_handle, 1024))){
     // </project> is the end tag, save it and return, all done.
     if (preg_match('|</project>|', $line)){
-      array_push(&$project, $line);
+      $project[] = $line;
       return($project);
     }
-    array_push(&$project, $line);
+    $project[] = $line;
   }
 }
 
@@ -114,7 +103,7 @@ function close_tag($handle){
  *
  * Parse the freshmeat input and return an array of tokens.
  *
- * @param string $line a string with space seperated tokens.  Some
+ * @param string $fm_string a string with space seperated tokens.  Some
  * of the tokens will be '...' or "..." with imbeded spaces.
  *
  * @return array $parms array with one token per entry
@@ -232,7 +221,7 @@ function write_pxml($file_handle, $pxml){
  * Save the name of the  FM project, in a file
  *
  * @param int $file_handle open file handle for writing.
- * @param string $pname string containing the project name.
+ * @param string $Updata string containing the project name.
  *
  * @author mark.donohoe@hp.com
  *
@@ -309,7 +298,7 @@ function read_pfile($xml_file) {
     );
     foreach($project->latest_release as $verdata){
       array_push(
-      &$fmprojs["$project->popularity_rank"] ["$project->projectname_short"],
+      $fmprojs["$project->popularity_rank"] ["$project->projectname_short"],
       $verdata->latest_release_version,
       $verdata->latest_release_id,
       $verdata->latest_release_date
@@ -319,4 +308,3 @@ function read_pfile($xml_file) {
   ksort($fmprojs);
   return($fmprojs);
 }
-?>

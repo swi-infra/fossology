@@ -1,28 +1,19 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Proxy;
 
 use Fossology\Lib\BusinessRules\LicenseMap;
+use Fossology\Lib\Dao\LicenseDao;
+use Fossology\Lib\Dao\UploadDao;
+use Fossology\Lib\Data\AgentRef;
 use Fossology\Lib\Data\DecisionScopes;
 use Fossology\Lib\Data\DecisionTypes;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
-use Fossology\Lib\Data\AgentRef;
 
 class UploadTreeProxy extends DbViewProxy
 {
@@ -72,7 +63,7 @@ class UploadTreeProxy extends DbViewProxy
    * @param string $uploadTreeTableName
    * @return string
    */
-  private function createUploadTreeViewQuery($options, $uploadTreeTableName)
+  public function createUploadTreeViewQuery($options, $uploadTreeTableName)
   {
     if (empty($options)) {
       return self::getDefaultUploadTreeView($this->uploadId, $uploadTreeTableName);
@@ -80,6 +71,14 @@ class UploadTreeProxy extends DbViewProxy
 
     $filter = '';
     $this->dbViewName = '';
+    /* @var $uploadDao UploadDao */
+    $uploadDao = $GLOBALS['container']->get('dao.upload');
+    $applyGlobal = $uploadDao->getGlobalDecisionSettingsFromInfo($this->uploadId);
+    if ($applyGlobal == 1) {
+      $applyGlobal = true;
+    } else {
+      $applyGlobal = false;
+    }
 
     if (array_key_exists(self::OPT_REALPARENT, $options)) {
       $filter .= " AND ut.ufile_mode & (1<<28) = 0 AND ut.realparent=".$this->addParamAndGetExpr('realParent',$options[self::OPT_REALPARENT]);
@@ -116,10 +115,10 @@ class UploadTreeProxy extends DbViewProxy
       $this->dbViewName .= "_".self::OPT_SKIP_ALREADY_CLEARED;
       $groupAlias = $this->addParamAndGetExpr('groupId', $options[self::OPT_GROUP_ID]);
       if (array_key_exists(self::OPT_RANGE, $options)) {
-        $filter .= ' AND '.self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $groupAlias, $agentFilter);
+        $filter .= ' AND '.self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $options, $groupAlias, $agentFilter, $applyGlobal);
       } elseif (array_key_exists(self::OPT_SKIP_ALREADY_CLEARED, $options) && array_key_exists(self::OPT_GROUP_ID, $options)
               && array_key_exists(self::OPT_AGENT_SET, $options) && array_key_exists(self::OPT_REALPARENT, $options)) {
-        $childFilter = self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $groupAlias, $agentFilter);
+        $childFilter = self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $options, $groupAlias, $agentFilter, $applyGlobal);
         $filter .= ' AND EXISTS(SELECT * FROM '.$this->uploadTreeTableName.' utc WHERE utc.upload_fk='.$this->uploadId
                 . ' AND (utc.lft BETWEEN ut.lft AND ut.rgt) AND utc.ufile_mode&(3<<28)=0 AND '
                    .preg_replace('/([a-z])ut\./', '\1utc.', $childFilter).')';
@@ -131,7 +130,7 @@ class UploadTreeProxy extends DbViewProxy
       $this->dbViewName .= "_".md5($options[self::OPT_ITEM_FILTER]);
     }
     $options[self::OPT_ITEM_FILTER] = $filter;
-    return self::getUploadTreeView($this->uploadId, $options, $uploadTreeTableName);
+    return self::getUploadTreeView($this->uploadId, $options, $uploadTreeTableName, $applyGlobal);
   }
 
   private function addConFilter($options)
@@ -181,16 +180,32 @@ class UploadTreeProxy extends DbViewProxy
 
   private function subqueryConcludeRefMatches($itemTable,$options)
   {
+    $globalSql = "";
+    $orderByGlobal = "";
+    /* @var $uploadDao UploadDao */
+    $uploadDao = $GLOBALS['container']->get('dao.upload');
+    $applyGlobal = $uploadDao->getGlobalDecisionSettingsFromInfo($this->uploadId);
+    if ($applyGlobal == 1) {
+      $applyGlobal = true;
+    } else {
+      $applyGlobal = false;
+    }
+    if ($applyGlobal) {
+      $globalSql = "OR (cd.scope=" . DecisionScopes::REPO .
+        " AND cd.pfile_fk=$itemTable.pfile_fk)";
+      $orderByGlobal = "CASE cd.scope WHEN " . DecisionScopes::REPO .
+        " THEN 1 ELSE 0 END,";
+    }
     return "NOT(SELECT (removed OR cd.decision_type=".DecisionTypes::IRRELEVANT.") excluded"
             . " FROM clearing_decision cd, clearing_decision_event cde, clearing_event ce"
          . "    WHERE ((cd.group_fk=".$this->addParamAndGetExpr('groupId', $options[self::OPT_GROUP_ID])
          . "      AND cd.uploadtree_fk=$itemTable.uploadtree_pk)"
-         . "        OR (cd.scope=".DecisionScopes::REPO." AND cd.pfile_fk=$itemTable.pfile_fk))"
-         . "      AND clearing_decision_pk=clearing_decision_fk"
+         . $globalSql
+         . ")     AND clearing_decision_pk=clearing_decision_fk"
          . "      AND clearing_event_fk=clearing_event_pk"
          . "      AND rf_fk=".$this->addParamAndGetExpr('conId',$options[self::OPT_CONCLUDE_REF])
          . "      AND cd.decision_type!=".DecisionTypes::WIP
-         . "      ORDER BY CASE cd.scope WHEN ".DecisionScopes::REPO." THEN 1 ELSE 0 END,cd.date_added DESC LIMIT 1)";
+         . "      ORDER BY $orderByGlobal cd.date_added DESC LIMIT 1)";
   }
 
   /**
@@ -215,9 +230,10 @@ class UploadTreeProxy extends DbViewProxy
    * @param $uploadId
    * @param $options
    * @param $uploadTreeTableName
+   * @param bool $applyGlobal
    * @return string
    */
-  private static function getUploadTreeView($uploadId, $options, $uploadTreeTableName)
+  private static function getUploadTreeView($uploadId, $options, $uploadTreeTableName, $applyGlobal = false)
   {
     $additionalCondition = array_key_exists(self::OPT_ITEM_FILTER, $options) ? $options[self::OPT_ITEM_FILTER] : '';
     $skipThese = array_key_exists(self::OPT_SKIP_THESE,$options) ? $options[self::OPT_SKIP_THESE] : 'none';
@@ -228,9 +244,11 @@ class UploadTreeProxy extends DbViewProxy
       case "noLicense":
       case self::OPT_SKIP_ALREADY_CLEARED:
       case "noCopyright":
+      case "noIpra":
       case "noEcc":
+      case "noKeyword":
 
-        $queryCondition = self::getQueryCondition($skipThese, $groupId, $agentFilter)." ".$additionalCondition;
+        $queryCondition = self::getQueryCondition($skipThese, $options, $groupId, $agentFilter, $applyGlobal)." ".$additionalCondition;
         if ('uploadtree' === $uploadTreeTableName || 'uploadtree_a' == $uploadTreeTableName) {
           $queryCondition = "ut.upload_fk=$uploadId AND ($queryCondition)";
         }
@@ -257,48 +275,78 @@ class UploadTreeProxy extends DbViewProxy
 
     if (array_key_exists(self::OPT_AGENT_SET, $options)) {
       $agentIds = 'array[' . implode(',',$options[self::OPT_AGENT_SET]) . ']';
-      $agentFilter = " AND lf.agent_fk=ANY($agentIds)";
+      $agentFilter = " AND lf.agent_fk = ANY($agentIds)";
     } else {
       $scanJobProxy = new ScanJobProxy($GLOBALS['container']->get('dao.agent'),$uploadId);
       $scanJobProxy->createAgentStatus(array_keys(AgentRef::AGENT_LIST));
       $latestAgentIds = $scanJobProxy->getLatestSuccessfulAgentIds();
-      $agentFilter = $latestAgentIds ? " AND lf.agent_fk=ANY(array[".implode(',',$latestAgentIds)."])" : "AND 0=1";
+      $agentFilter = $latestAgentIds ? " AND lf.agent_fk = ANY(array[".implode(',',$latestAgentIds)."])" : "AND 0=1";
     }
     return $agentFilter;
   }
 
   /**
    * @param $skipThese
+   * @param $options
+   * @param $groupId
+   * @param string $agentFilter
+   * @param bool $applyGlobal
    * @return string
    */
-  private static function getQueryCondition($skipThese, $groupId = null, $agentFilter='')
+  private static function getQueryCondition($skipThese, $options, $groupId = null, $agentFilter='', $applyGlobal = false)
   {
-    $conditionQueryHasLicense = "(EXISTS (SELECT 1 FROM license_ref lr INNER JOIN license_file lf"
-      . " ON lf.rf_fk=lr.rf_pk WHERE rf_shortname NOT IN ('No_license_found', 'Void') AND lf.pfile_fk = ut.pfile_fk $agentFilter LIMIT 1)
-        OR EXISTS (SELECT 1 FROM clearing_decision AS cd WHERE cd.group_fk = $groupId AND ut.uploadtree_pk = cd.uploadtree_fk LIMIT 1))";
+    global $container;
+    /** @var LicenseDao $licenseDao */
+    $licenseDao = $container->get('dao.license');
+    $licensesToRemove = [];
+    foreach (['No_license_found', 'Void'] as $licenseName) {
+      $license = $licenseDao->getLicenseByShortName($licenseName);
+      if ($license) {
+        $licensesToRemove[] = "lf.rf_fk != " . $license->getId();
+      }
+    }
+    $licensesToRemove = implode(' AND ', $licensesToRemove);
+    if (!empty($licensesToRemove)) {
+      $licensesToRemove = "($licensesToRemove) AND ";
+    }
+    if ($applyGlobal) {
+      $globalSql = "(
+        ut.uploadtree_pk = cd.uploadtree_fk AND cd.group_fk = $groupId
+        AND cd.scope = ".DecisionScopes::ITEM."
+      ) OR (
+        cd.pfile_fk = ut.pfile_fk AND cd.scope=" . DecisionScopes::REPO . "
+      )";
+    } else {
+      $globalSql = "ut.uploadtree_pk = cd.uploadtree_fk AND cd.group_fk = $groupId";
+    }
+    $conditionQueryHasLicense = "(EXISTS (SELECT 1 FROM license_file lf " .
+      "WHERE ($licensesToRemove" .
+      "lf.pfile_fk = ut.pfile_fk $agentFilter))" .
+      "OR EXISTS (SELECT 1 FROM clearing_decision AS cd " .
+      "WHERE cd.group_fk = $groupId AND ut.uploadtree_pk = cd.uploadtree_fk))";
 
     switch ($skipThese) {
       case "noLicense":
         return $conditionQueryHasLicense;
       case self::OPT_SKIP_ALREADY_CLEARED:
         $decisionQuery = "
-SELECT decision_type, ROW_NUMBER() OVER (
-  PARTITION BY pfile_fk ORDER BY clearing_decision_pk
-) AS rnum
-FROM (
-  SELECT * FROM clearing_decision cd
-  WHERE (
-    ut.uploadtree_pk = cd.uploadtree_fk AND cd.group_fk = $groupId
-  ) OR (
-    cd.pfile_fk = ut.pfile_fk AND cd.scope=".DecisionScopes::REPO."
-  )
-) AS filtered_clearing_decision ORDER BY rnum DESC LIMIT 1";
+SELECT cd.decision_type
+FROM clearing_decision cd
+WHERE $globalSql
+ORDER BY cd.clearing_decision_pk DESC LIMIT 1";
         return " $conditionQueryHasLicense
-            AND NOT EXISTS (SELECT 1 FROM ($decisionQuery) as latest_decision WHERE latest_decision.decision_type IN (".DecisionTypes::IRRELEVANT.",".DecisionTypes::IDENTIFIED.",".DecisionTypes::DO_NOT_USE.") )";
+            AND NOT EXISTS (SELECT 1 FROM ($decisionQuery) AS latest_decision WHERE latest_decision.decision_type IN (".DecisionTypes::IRRELEVANT.",".DecisionTypes::IDENTIFIED.",".DecisionTypes::DO_NOT_USE.",".DecisionTypes::NON_FUNCTIONAL."))";
       case "noCopyright":
-        return "EXISTS (SELECT copyright_pk FROM copyright cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )";
+        return "EXISTS (SELECT copyright_pk FROM copyright cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )".
+              " OR EXISTS (SELECT 1 FROM copyright_decision AS cd WHERE ut.pfile_fk = cd.pfile_fk)";
+      case "noIpra":
+        return "EXISTS (SELECT ipra_pk FROM ipra cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )".
+              " OR EXISTS (SELECT 1 FROM ipra_decision AS cd WHERE ut.pfile_fk = cd.pfile_fk)";
       case "noEcc":
-        return "EXISTS (SELECT ecc_pk FROM ecc cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )";
+        return "EXISTS (SELECT ecc_pk FROM ecc cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )".
+              " OR EXISTS (SELECT 1 FROM ecc_decision AS cd WHERE ut.pfile_fk = cd.pfile_fk)";
+      case "noKeyword":
+        return "EXISTS (SELECT keyword_pk FROM keyword cp WHERE cp.pfile_fk=ut.pfile_fk and cp.hash is not null )";
     }
   }
 

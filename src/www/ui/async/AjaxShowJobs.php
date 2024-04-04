@@ -1,22 +1,13 @@
 <?php
 /*
- Copyright (C) 2015-2019, Siemens AG
+ SPDX-FileCopyrightText: © 2015-2019, 2021 Siemens AG
+ SPDX-FileCopyrightText: © 2020 Robert Bosch GmbH
+ SPDX-FileCopyrightText: © Dineshkumar Devarajan <Devarajan.Dineshkumar@in.bosch.com>
  Author: Shaheem Azmal<shaheem.azmal@siemens.com>,
          Anupam Ghosh <anupam.ghosh@siemens.com>
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * @namespace Fossology::UI::Ajax
@@ -25,9 +16,9 @@
 namespace Fossology\UI\Ajax;
 
 use Fossology\Lib\Auth\Auth;
+use Fossology\Lib\Dao\ClearingDao;
 use Fossology\Lib\Dao\ShowJobsDao;
 use Fossology\Lib\Dao\UserDao;
-use Fossology\Lib\Dao\ClearingDao;
 use Fossology\Lib\Db\DbManager;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
@@ -132,6 +123,13 @@ class AjaxShowJobs extends \FO_Plugin
       $value ="";
       $label = $labelKey;
       switch ($field) {
+        case 'job_queued':
+        case 'jq_starttime':
+        case 'jq_endtime':
+          if (! empty($row[$field])) {
+            $value = Convert2BrowserTime($row[$field]);
+          }
+          break;
         case 'jq_itemsprocessed':
           $value = number_format($row[$field]);
           break;
@@ -154,7 +152,7 @@ class AjaxShowJobs extends \FO_Plugin
           }
           break;
         case 'jq_log':
-          if (empty($row[$field]) || !file_exists($row[$field])) {
+          if (empty($row[$field]) || $row[$field] == 'removed' || !file_exists($row[$field])) {
             break;
           }
           if (filesize($row[$field]) > self::MAX_LOG_OUTPUT) {
@@ -211,7 +209,7 @@ class AjaxShowJobs extends \FO_Plugin
    * @param array $jobData
    * @return Returns an upload job status in array
    **/
-  protected function getShowJobsForEachJob($jobData)
+  public function getShowJobsForEachJob($jobData)
   {
     if (count($jobData) == 0) {
       return array('showJobsData' => "There are no jobs to display");
@@ -224,6 +222,14 @@ class AjaxShowJobs extends \FO_Plugin
         'jobQueue' => $jobs['jobqueue']
       );
       foreach ($jobArr['jobQueue'] as $key => $singleJobQueue) {
+        if (! empty($jobArr['jobQueue'][$key]['jq_starttime'])) {
+          $jobArr['jobQueue'][$key]['jq_starttime'] = Convert2BrowserTime(
+            $jobArr['jobQueue'][$key]['jq_starttime']);
+        }
+        if (! empty($jobArr['jobQueue'][$key]['jq_endtime'])) {
+          $jobArr['jobQueue'][$key]['jq_endtime'] = Convert2BrowserTime(
+            $jobArr['jobQueue'][$key]['jq_endtime']) ;
+        }
         if (! empty($singleJobQueue["jq_endtime"])) {
           $numSecs = strtotime($singleJobQueue['jq_endtime']) -
             strtotime($singleJobQueue['jq_starttime']);
@@ -275,6 +281,9 @@ class AjaxShowJobs extends \FO_Plugin
           case 'spdx2tv':
             $jobArr['jobQueue'][$key]['download'] = "SPDX2 tag/value report";
             break;
+          case 'spdx2csv':
+            $jobArr['jobQueue'][$key]['download'] = "SPDX2 CSV report";
+            break;
           case 'dep5':
             $jobArr['jobQueue'][$key]['download'] = "DEP5 copyright file";
             break;
@@ -283,6 +292,15 @@ class AjaxShowJobs extends \FO_Plugin
             break;
           case 'unifiedreport':
             $jobArr['jobQueue'][$key]['download'] = "Unified Report";
+            break;
+          case 'clixml':
+            $jobArr['jobQueue'][$key]['download'] = "Clixml Report";
+            break;
+          case 'cyclonedx':
+            $jobArr['jobQueue'][$key]['download'] = "CycloneDX json Report";
+            break;
+          case 'decisionexporter':
+            $jobArr['jobQueue'][$key]['download'] = "FOSSology Decisions";
             break;
           default:
             $jobArr['jobQueue'][$key]['download'] = "";

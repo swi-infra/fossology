@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- * Copyright (C) 2014-2015,2018 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2014-2015, 2018 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\DeciderJob\UI\DeciderJobAgentPlugin;
 use Fossology\Lib\Auth\Auth;
@@ -51,11 +40,11 @@ class ChangeLicenseBulk extends DefaultPlugin
    * @param Request $request
    * @return Response
    */
-  protected function handle(Request $request)
+  public function handle(Request $request)
   {
     $uploadTreeId = intval($request->get('uploadTreeId'));
     if ($uploadTreeId <= 0) {
-      return new JsonResponse(array("error" => 'bad request'), JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
+      return new JsonResponse(array("error" => 'bad request'), JsonResponse::HTTP_BAD_REQUEST);
     }
 
     try {
@@ -108,12 +97,17 @@ class ChangeLicenseBulk extends DefaultPlugin
 
     $refText = $request->get('refText');
     $actions = $request->get('bulkAction');
+    $ignoreIrrelevantFiles = (intval($request->get('ignoreIrre')) == 1);
+    $scanFindingsOnly = boolval(intval($request->get('scanOnlyFindings')));
+    $delimiters = $request->get('delimiters');
 
     $licenseRemovals = array();
     foreach ($actions as $licenseAction) {
       $licenseRemovals[$licenseAction['licenseId']] = array(($licenseAction['action']=='Remove'), $licenseAction['comment'], $licenseAction['reportinfo'], $licenseAction['acknowledgement']);
     }
-    $bulkId = $this->licenseDao->insertBulkLicense($userId, $groupId, $uploadTreeId, $licenseRemovals, $refText);
+    $bulkId = $this->licenseDao->insertBulkLicense($userId, $groupId,
+      $uploadTreeId, $licenseRemovals, $refText, $ignoreIrrelevantFiles,
+      $delimiters, $scanFindingsOnly);
 
     if ($bulkId <= 0) {
       throw new Exception('cannot insert bulk reference');

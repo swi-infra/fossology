@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2012 Hewlett-Packard Development Company, L.P.
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -84,7 +73,7 @@ function RepPath($PfilePk, $Repo="files")
     return (null);
   }
   $Hash = $Row['pfile_sha1'] . "." . $Row['pfile_md5'] . "." . $Row['pfile_size'];
-  exec("$LIBEXECDIR/reppath $Repo $Hash", $Path);
+  exec("$LIBEXECDIR/reppath $Repo ".escapeshellarg($Hash), $Path);
   return($Path[0]);
 } // RepPath()
 
@@ -117,6 +106,6 @@ function RepPathItem($Item, $Repo="files")
     return (null);
   }
   $Hash = $Row['pfile_sha1'] . "." . $Row['pfile_md5'] . "." . $Row['pfile_size'];
-  exec("$LIBEXECDIR/reppath $Repo $Hash", $Path);
+  exec("$LIBEXECDIR/reppath $Repo ".escapeshellarg($Hash), $Path);
   return($Path[0]);
 }

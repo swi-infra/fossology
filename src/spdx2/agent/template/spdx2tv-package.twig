@@ -1,33 +1,49 @@
-{# Copyright 2015 Siemens AG
+{# SPDX-FileCopyrightText: © 2015 Siemens AG
 
-   Copying and distribution of this file, with or without modification,
-   are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-   This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 
 PackageName: {{ packageName }}
 PackageFileName: {{ uploadName }}
 SPDXID: SPDXRef-upload{{ packageId }}
 PackageDownloadLocation: NOASSERTION
+{% if packageVersion is not empty %}
+PackageVersion: {{ packageVersion }}
+{% endif %}
+{% if releaseDate is not empty %}
+ReleaseDate: {{ releaseDate }}
+{% endif %}
+FilesAnalyzed: true
 PackageVerificationCode: {{ verificationCode }}
 PackageChecksum: SHA1: {{ sha1 | lower }}
-{# PackageChecksum: SHA256: #}
+PackageChecksum: SHA256: {{ sha256 | lower }}
 PackageChecksum: MD5: {{ md5 | lower }}
 {# PackageChecksum: SSDEEP: #}
 {% if mainLicenses|default is empty %}
 PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 {% else %}
-PackageLicenseConcluded: {{ mainLicense }}
-PackageLicenseDeclared: {{ mainLicense }}
+PackageLicenseConcluded: {{ mainLicenseString }}
+PackageLicenseDeclared: {{ mainLicenseString }}
 {% endif %}
 {% if licenseComments %}PackageLicenseComments: <text> {{ licenseComments|replace({'<text>':'&lt;text&gt;','</text>':'&lt;/text&gt;'}) }} </text>
 {% endif %}
 PackageLicenseInfoFromFiles: NOASSERTION
 PackageCopyrightText: NOASSERTION
+{%- if generalAssessment is not empty ~%}
+PackageComment: <text> {{ generalAssessment|replace({'<text>':'&lt;text&gt;','</text>':'&lt;/text&gt;'}) }} </text>
+{%- endif ~%}
+{% if obligations|default is not empty %}
+PackageAttributionText: <text> {{ obligations|join('\n')
+                                             |replace({'<text>':'&lt;text&gt;','</text>':'&lt;/text&gt;'})
+                                             |replace({'\f':''}) }} </text>
+{% endif %}
 
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-upload{{ packageId }}
 {# RelationshipComment: #}
+{%- if componentId is not empty ~%}
+ExternalRef: PACKAGE-MANAGER {{ componentType }} {{ componentId }}
+{%- endif ~%}
 
 ##--------------------------
 ## File Information

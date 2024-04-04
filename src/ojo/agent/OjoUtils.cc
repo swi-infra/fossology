@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * The utility functions for OJO agent
@@ -107,13 +96,14 @@ void bail(int exitval)
  * @param state           State of the agent
  * @param uploadId        Upload ID to be scanned
  * @param databaseHandler Database handler to be used
+ * @param ignoreFilesWithMimeType To ignore files with particular mimetype
  * @return True in case of successful scan, false otherwise.
  */
 bool processUploadId(const OjoState &state, int uploadId,
-    OjosDatabaseHandler &databaseHandler)
+    OjosDatabaseHandler &databaseHandler, bool ignoreFilesWithMimeType)
 {
-  vector<unsigned long> fileIds = databaseHandler.queryFileIdsForScan(
-      uploadId, state.getAgentId());
+  vector<unsigned long> fileIds = databaseHandler.queryFileIdsForUpload(
+      uploadId, state.getAgentId(), ignoreFilesWithMimeType);
   char const *repoArea = "files";
 
   bool errors = false;
@@ -151,7 +141,9 @@ bool processUploadId(const OjoState &state, int uploadId,
       vector<ojomatch> identified;
       try
       {
-        identified = agentObj.processFile(filePath, threadLocalDatabaseHandler);
+        identified = agentObj.processFile(filePath, threadLocalDatabaseHandler,
+                                          state.getCliOptions().getGroupId(),
+                                          state.getCliOptions().getUserId());
       }
       catch (std::runtime_error &e)
       {
@@ -254,6 +246,9 @@ bool parseCliOptions(int argc, char **argv, OjoCliOptions &dest,
       "json,J", "output JSON"
     )
     (
+      "ignoreFilesWithMimeType,I", "ignoreFilesWithMimeType"
+    )
+    (
       "config,c",
       boost::program_options::value<string>(),
       "path to the sysconfigdir"
@@ -308,8 +303,19 @@ bool parseCliOptions(int argc, char **argv, OjoCliOptions &dest,
 
     unsigned long verbosity = vm.count("verbose");
     bool json = vm.count("json") > 0 ? true : false;
+    bool  ignoreFilesWithMimeType = vm.count("ignoreFilesWithMimeType") > 0 ?  true : false;
 
-    dest = OjoCliOptions(verbosity, json);
+    dest = OjoCliOptions(verbosity, json, ignoreFilesWithMimeType);
+
+    if (vm.count("userID") > 0)
+    {
+      dest.setUserId(vm["userID"].as<int>());
+    }
+
+    if (vm.count("groupID") > 0)
+    {
+      dest.setGroupId(vm["groupID"].as<int>());
+    }
 
     if (vm.count("directory"))
     {

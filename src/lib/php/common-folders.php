@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2015 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2014-2017 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2008-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- ***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\FolderDao;
@@ -230,7 +219,7 @@ function FolderListOption($ParentFolder,$Depth, $IncludeTop=1, $SelectId=-1, $li
 
     /* Load any subfolders */
     /* Now create the HTML */
-    $V .= htmlentities($Name);
+    $V .= htmlentities($Name, ENT_HTML5 | ENT_QUOTES);
     $V .= "</option>\n";
   }
   /* Load any subfolders */
@@ -351,7 +340,7 @@ function FolderGetFromUpload($Uploadpk, $Folder = -1, $Stop = -1)
   if (empty($List)) {
     $List = array();
   }
-  array_push($List,$V);
+  $List[] = $V;
   pg_free_result($result);
   return($List);
 } // FolderGetFromUpload()
@@ -414,9 +403,9 @@ function FolderListUploads_perm($ParentFolder, $perm)
     $New = array();
     $New['upload_pk'] = $R['upload_pk'];
     $New['upload_desc'] = $R['upload_desc'];
-    $New['upload_ts'] = substr($R['upload_ts'], 0, 19);
+    $New['upload_ts'] = Convert2BrowserTime(substr($R['upload_ts'], 0, 19));
     $New['name'] = $R['upload_filename'];
-    array_push($List,$New);
+    $List[] = $New;
   }
   pg_free_result($result);
   return($List);
@@ -488,7 +477,7 @@ function FolderListUploadsRecurse($ParentFolder=-1, $FolderPath = '',
     $New['upload_desc'] = $R['upload_desc'];
     $New['name'] = $R['ufile_name'];
     $New['folder'] = $FolderPath . "/" . $R['folder_name'];
-    array_push($List,$New);
+    $List[] = $New;
   }
   pg_free_result($result);
 

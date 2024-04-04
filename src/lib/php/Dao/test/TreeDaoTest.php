@@ -1,21 +1,10 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
-Copyright (C) 2017 TNG Technology Consulting GmbH
-Author: Steffen Weber, Johannes Najjar, Maximilian Huber
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ SPDX-FileCopyrightText: © 2017 TNG Technology Consulting GmbH
+ Author: Steffen Weber, Johannes Najjar, Maximilian Huber
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
@@ -32,7 +21,7 @@ class TreeDaoTest extends \PHPUnit\Framework\TestCase
   /** @var TreeDao */
   private $treeDao;
 
-  protected function setUp()
+  protected function setUp() : void
   {
     $this->testDb = new TestPgDb();
     $this->dbManager = &$this->testDb->getDbManager();
@@ -49,7 +38,7 @@ class TreeDaoTest extends \PHPUnit\Framework\TestCase
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
   }
 
-  protected function tearDown()
+  protected function tearDown() : void
   {
     $this->addToAssertionCount(\Hamcrest\MatcherAssert::getCount()-$this->assertCountBefore);
 
@@ -261,9 +250,9 @@ class TreeDaoTest extends \PHPUnit\Framework\TestCase
     $this->testDb->createPlainTables(array('pfile'));
     $this->dbManager->queryOnce('ALTER TABLE uploadtree RENAME TO uploadtree_a');
     $this->testDb->insertData(array('uploadtree_a','pfile'));
-    // (pfile_pk, pfile_md5, pfile_sha1, pfile_size) := (4, '59CACDFCE5051CD8A1D8A1F2DCCE40A5', '04621571BCBABCE75C4DD1C6445B87DEC0995734', 12320);
-    $hashes = $this->treeDao->getItemHashes(7,'uploadtree_a');
-    assertThat($hashes,equalTo(array('md5'=>'59CACDFCE5051CD8A1D8A1F2DCCE40A5','sha1'=>'04621571BCBABCE75C4DD1C6445B87DEC0995734')));
+    // (pfile_pk, pfile_md5, pfile_sha1, pfile_sha256, pfile_size) := (762, 'C655F0AD3E4D3F90D8EE0541DD636E2E', 'D62DCD25DC68180758FD1C064ADC91AB70A78CB1', '8F39AC8ADD8CD0C0C2BF8924CE3B24F4B2760B8723BFD4205A49FB142490A355', 34);
+    $hashes = $this->treeDao->getItemHashes(463,'uploadtree_a');
+    assertThat($hashes,equalTo(array('md5'=>'C655F0AD3E4D3F90D8EE0541DD636E2E','sha1'=>'D62DCD25DC68180758FD1C064ADC91AB70A78CB1','sha256'=>'8F39AC8ADD8CD0C0C2BF8924CE3B24F4B2760B8723BFD4205A49FB142490A355')));
   }
 
   protected function getNestedTestFileStructure()

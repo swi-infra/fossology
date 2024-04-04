@@ -1,8 +1,6 @@
-{# Copyright 2014-2015 Siemens AG
+{# SPDX-FileCopyrightText: © 2014-2015 Siemens AG
 
-   Copying and distribution of this file, with or without modification,
-   are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-   This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 {% extends "include/base.html.twig" %}
 
@@ -18,10 +16,16 @@
     </label>
     <input name="file_input" type="file"/><br/>
     {{ 'Delimiter'|trans }}: <input type="text" name="delimiter" value="," size="1" maxlength="1" /><br/>
-    {{ 'Enclosure'|trans }}: <input type="text" name="enclosure" value="&quot;" size="1" maxlength="1" /><br/>         
+    {{ 'Enclosure'|trans }}: <input type="text" name="enclosure" value="&quot;" size="1" maxlength="1" /><br/>
     <br/>
     <p>&nbsp;&nbsp;&nbsp;&nbsp;<input type="submit" value="{{ 'Upload'| trans }}"/>
     </p>
+    {% if not(license_csv_import is empty) %}
+    <p>
+      {{ 'NOTE: Obligations will not get imported, To import go to Admin -> Obligation Admin -> CSV Import'| trans }} <br/>
+    </p>
+    {% endif %}
+
   </form>
 
 {% endblock %}

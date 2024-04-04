@@ -1,19 +1,8 @@
 /*
-Author: Daniele Fognini, Andreas Wuerl
-Copyright (C) 2013-2015, Siemens AG
+ Author: Daniele Fognini, Andreas Wuerl
+ SPDX-FileCopyrightText: © 2013-2015 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 #include "monk.h"
@@ -34,7 +23,7 @@ void parseArguments(MonkState* state, int argc, char** argv, int* fileOptInd) {
                                          {"jobId", required_argument, 0, 'j'},
                                          {NULL, 0, NULL, 0}};
   int option_index = 0;
-  while ((c = getopt_long(argc, argv, "VvJhs:k:c:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "VvJhIs:k:c:", long_options, &option_index)) != -1) {
     switch (c) {
       case 'c':
         break;
@@ -67,8 +56,12 @@ void parseArguments(MonkState* state, int argc, char** argv, int* fileOptInd) {
         state->scanMode = MODE_CLI_OFFLINE;
         state->knowledgebaseFile = optarg;
         break;
+      case 'I':
+        state->ignoreFilesWithMimeType = true;
+        break;
       case 'h':
       case '?':
+      default:
         printf("Usage:\n"
                "\nAs CLI tool using the licenses from the FOSSology database:\n");
         printf("       %s [options] file [file [...]]\n", argv[0]);
@@ -113,12 +106,14 @@ void parseArguments(MonkState* state, int argc, char** argv, int* fileOptInd) {
 
 int main(int argc, char** argv) {
   int fileOptInd;
+
   MonkState stateStore = { .dbManager = NULL,
                            .agentId = 0,
                            .scanMode = 0,
                            .verbosity = 0,
                            .knowledgebaseFile = NULL,
                            .json = 0,
+                           .ignoreFilesWithMimeType = false,
                            .ptr = NULL };
   MonkState* state = &stateStore;
   parseArguments(state, argc, argv, &fileOptInd);

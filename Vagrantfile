@@ -1,8 +1,9 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Copyright Siemens AG, 2014
-# SPDX-License-Identifier:  GPL-2.0 LGPL-2.1
+# SPDX-FileCopyrightText: © 2014,2022, Siemens AG
+
+# SPDX-License-Identifier: GPL-2.0-only AND LGPL-2.1-only
 $post_up_message = <<WELCOME
 Use your FOSSology at http://localhost:8081/repo/
   user: fossy , password: fossy
@@ -44,9 +45,9 @@ cd /fossology
 
 DEBIAN_FRONTEND=noninteractive ./utils/fo-installdeps -y
 
-sudo make clean
-make
-sudo make install
+sudo cmake -DCMAKE_BUILD_TYPE=Release -S. -B./build -G Ninja 
+sudo cmake --build ./build --parallel 
+sudo ninja -C ./build install
 
 sudo /usr/local/lib/fossology/fo-postinstall
 
@@ -62,7 +63,7 @@ sudo systemctl daemon-reload
 SCRIPT
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/xenial64"
+  config.vm.box = "ubuntu/focal64"
   config.vm.post_up_message = $post_up_message
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder ".", "/fossology"

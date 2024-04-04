@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2014 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2014 Hewlett-Packard Development Company, L.P.
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- ***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -276,7 +265,7 @@ $ShowBox=1, $ShowMicro=NULL, $Enumerate=-1, $PreText='', $PostText='', $uploadtr
 {
   $V = "";
   if ($ShowBox) {
-    $V .= "<div style='border: thin dotted gray; background-color:lightyellow'>\n";
+    $V .= "<div class='alert alert-info' style='padding:5px;'>\n";
   }
 
   if ($Enumerate >= 0) {
@@ -293,8 +282,6 @@ $ShowBox=1, $ShowMicro=NULL, $Enumerate=-1, $PreText='', $PostText='', $uploadtr
    */
   $Path = Dir2Path($UploadtreePk, $uploadtree_tablename);
   $Last = &$Path[count($Path)-1];
-
-  $V .= "<font class='text'>\n";
 
   /* Add in additional text */
   if (! empty($PreText)) {
@@ -351,7 +338,6 @@ $ShowBox=1, $ShowMicro=NULL, $Enumerate=-1, $PreText='', $PostText='', $uploadtr
       $V .= "</a>";
     }
   }
-  $V .= "</font>\n";
 
   if (! empty($ShowMicro)) {
     $MenuDepth = 0; /* unused: depth of micro menu */
@@ -539,14 +525,12 @@ function GetNonArtifactChildren($uploadtree_pk, $uploadtree_tablename='uploadtre
   $foundChildren = array();
   foreach ($children as $key => $child) {
     if (Isartifact($child['ufile_mode'])) {
+      unset($children[$key]);
       if (Iscontainer($child['ufile_mode'])) {
-        unset($children[$key]);
         $NonAChildren = GetNonArtifactChildren($child['uploadtree_pk'], $uploadtree_tablename);
         if ($NonAChildren) {
           $foundChildren = array_merge($foundChildren, $NonAChildren);
         }
-      } else {
-        unset($children[$key]);
       }
     } else {
       $foundChildren[$key] = $child;

@@ -1,20 +1,9 @@
 <?php
 /*
- * Copyright (C) 2015-2017, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2015-2017 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 namespace Fossology\ReportImport;
 
 use Fossology\Lib\Dao\ClearingDao;
@@ -26,6 +15,7 @@ use Fossology\ReportImport\ReportImportHelper;
 use Fossology\Lib\Data\Clearing\ClearingEventTypes;
 use Fossology\Lib\Data\DecisionScopes;
 use Fossology\Lib\Data\DecisionTypes;
+use Fossology\Lib\Db\DbManager;
 
 require_once 'ReportImportConfiguration.php';
 
@@ -63,6 +53,7 @@ class ReportImportSink
    * @param $userDao
    * @param $licenseDao
    * @param $clearingDao
+   * @param $copyrightDao
    * @param $dbManager
    * @param $groupId
    * @param $userId
@@ -146,7 +137,11 @@ class ReportImportSink
   public function getIdForDataItemOrCreateLicense($dataItem, $groupId)
   {
     $licenseShortName = $dataItem->getLicenseId();
-    $license = $this->licenseDao->getLicenseByShortName($licenseShortName, $groupId);
+    if ($this->configuration->shouldMatchLicenseNameWithSPDX()) {
+      $license = $this->licenseDao->getLicenseBySpdxId($licenseShortName, $groupId);
+    } else {
+      $license = $this->licenseDao->getLicenseByShortName($licenseShortName, $groupId);
+    }
     if ($license !== null)
     {
       return $license->getId();
@@ -163,7 +158,8 @@ class ReportImportSink
       if($this->configuration->isCreateLicensesAsCandidate() || !$this->userIsAdmin)
       {
         echo "Creating it as license candidate ...\n";
-        $licenseId = $this->licenseDao->insertUploadLicense($licenseShortName, $licenseCandidate->getText(), $groupId);
+        $licenseId = $this->licenseDao->insertUploadLicense($licenseShortName,
+          $licenseCandidate->getText(), $groupId, $this->userId);
         $this->licenseDao->updateCandidate(
           $licenseId,
           $licenseCandidate->getShortName(),
@@ -171,15 +167,19 @@ class ReportImportSink
           $licenseCandidate->getText(),
           $licenseCandidate->getUrl(),
           "Created for ReportImport with jobId=[".$this->jobId."]",
+          date(DATE_ATOM),
+          $this->userId,
           false,
-          0);
+          0,
+          $licenseCandidate->getShortName()
+        );
         return $licenseId;
       }
       else
       {
         echo "creating it as license ...\n";
         $licenseText = trim($licenseCandidate->getText());
-        return $this->licenseDao->insertLicense($licenseCandidate->getShortName(), $licenseText, $licenseCandidate->getSpdxCompatible());
+        return $this->licenseDao->insertLicense($licenseCandidate->getShortName(), $licenseText, $licenseCandidate->getShortName());
       }
     }
     return -1;
@@ -243,6 +243,7 @@ class ReportImportSink
           ClearingEventTypes::IMPORT,
           trim($licenseText),
           '', // comment
+          '', // ack
           $this->jobId);
       }
       foreach ($removeLicenseIds as $licenseId)
@@ -257,6 +258,7 @@ class ReportImportSink
           ClearingEventTypes::IMPORT,
           $licenseText,
           '', // comment
+          '', // ack
           $this->jobId);
       }
       $this->clearingDao->createDecisionFromEvents(

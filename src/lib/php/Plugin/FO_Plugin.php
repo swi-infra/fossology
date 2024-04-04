@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2013 Hewlett-Packard Development Company, L.P.
- * Copyright (C) 2014-2017 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Plugin\Plugin;
@@ -41,6 +30,7 @@ define("PLUGIN_STATE_READY", 2); // used during post-install
 define("PLUGIN_DB_NONE", 0);
 define("PLUGIN_DB_READ", 1);
 define("PLUGIN_DB_WRITE", 3);        /* DB writes permitted */
+define("PLUGIN_DB_CADMIN", 5);       /* DB writes permitted, with additional clearing permissions */
 define("PLUGIN_DB_ADMIN", 10);        /* add/delete users */
 
 
@@ -49,7 +39,8 @@ $NoneText = _("None");
 $ReadText = _("Read");
 $WriteText = _("Write");
 $AdminText = _("Admin");
-$GLOBALS['PERM_NAMES'] = array(Auth::PERM_NONE => $NoneText, Auth::PERM_READ => $ReadText, Auth::PERM_WRITE => $WriteText, Auth::PERM_ADMIN => $AdminText);
+$cAdminText = _("Clearing Admin");
+$GLOBALS['PERM_NAMES'] = array(Auth::PERM_NONE => $NoneText, Auth::PERM_READ => $ReadText, Auth::PERM_WRITE => $WriteText, Auth::PERM_ADMIN => $AdminText, Auth::PERM_CADMIN => $cAdminText);
 
 /**
  * \class FO_Plugin
@@ -324,6 +315,7 @@ class FO_Plugin implements Plugin
 
     $metadata = "<meta name='description' content='The study of Open Source'>\n";
     $metadata .= "<meta http-equiv='Content-Type' content='text/html;charset=UTF-8'>\n";
+    $metadata .= "<meta name='viewport' content='width=device-width,initial-scale=1.0'>\n";
 
     $this->vars['metadata'] = $metadata;
 
@@ -335,6 +327,8 @@ class FO_Plugin implements Plugin
     $styles .= "<link rel='stylesheet' href='css/select2.min.css'>\n";
     $styles .= "<link rel='stylesheet' href='css/jquery.dataTables.css'>\n";
     $styles .= "<link rel='stylesheet' href='css/fossology.css'>\n";
+    $styles .= "<link rel='stylesheet' href='css/bootstrap-icons.css'>\n";
+    $styles .= "<link rel='stylesheet' href='css/bootstrap/bootstrap.min.css'>\n";
     $styles .= "<link rel='icon' type='image/x-icon' href='favicon.ico'>\n";
     $styles .= "<link rel='shortcut icon' type='image/x-icon' href='favicon.ico'>\n";
 
@@ -419,7 +413,7 @@ class FO_Plugin implements Plugin
    */
   public function renderString($templateName, $vars = null)
   {
-    return $this->renderer->loadTemplate($templateName)->render($vars ?: $this->vars);
+    return $this->renderer->load($templateName)->render($vars ?: $this->vars);
   }
 
   /**

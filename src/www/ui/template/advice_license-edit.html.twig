@@ -1,8 +1,6 @@
-{# Copyright 2014-2015 Siemens AG
+{# SPDX-FileCopyrightText: © 2014-2015 Siemens AG
 
-   Copying and distribution of this file, with or without modification,
-   are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-   This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 {% extends "include/base.html.twig" %}
 
@@ -12,6 +10,28 @@
   <input type="hidden" name="mod" value="advice_license"/>
   <input type="hidden" name="rf" value="{{ rf_pk }}"/>
   <table>
+  {% if rf_lastmodified is not empty %}
+    <tr>
+      <td>{{ 'User Created'|trans }}:</td>
+      <td><span> {{ rf_user_fk_created|e }}</span></td>
+    </tr>    
+    <tr>
+      <td>{{ 'Date of Creation'|trans }}:</td>
+      <td><span> {{ rf_creationdate|e }}</span></td>
+    </tr>
+    <tr>
+      <td>{{ 'User Modified'|trans }}:</td>
+      <td><span> {{ rf_user_fk_modified|e }}</span></td>
+    </tr>
+    <tr>
+      <td>{{ 'Last Modified'|trans }}:</td>
+      <td><span> {{ rf_lastmodified|e }}</span></td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td>{{ 'SPDX ID'|trans }}:</td>
+      <td><input type="input" name="spdx_id" value="{{ rf_spdx_id|e }}"/></td>
+    </tr>
     <tr>
       <td>{{ 'Shortname'|trans }}:</td>
       <td><input type="input" name="shortname" value="{{ rf_shortname|e }}"/></td>

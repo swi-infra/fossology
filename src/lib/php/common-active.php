@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2012 Hewlett-Packard Development Company, L.P.
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -29,7 +18,7 @@
  **/
 function js_url()
 {
-  $script = "
+  return "
     <script type=\"text/javascript\">
       function js_url(val, url)
       {
@@ -37,8 +26,6 @@ function js_url()
       }
     </script>
   ";
-
-  return $script;
 }
 
 
@@ -59,7 +46,7 @@ function displayMessage($Message, $keep = null)
   $HTML = null;
   $HTML .= "\n<div id='dmessage'>";
   $text = _("Close");
-  $HTML .= "<button name='eraseme' value='close' onclick='rmMsg()'> $text</button>\n";
+  $HTML .= "<button name='eraseme' value='close' class='btn btn-default btn-sm' onclick='rmMsg()'> $text</button>\n";
   $HTML .= $Message;
   $HTML .= $keep . "\n</p>";
   $HTML .= "  <hr>\n";
@@ -109,7 +96,7 @@ function ActiveHTTPscript($RequestName,$IncludeScriptTags=1)
 
   $HTML .= "var $RequestName=null;\n";
   /* Check for browser support. */
-  $HTML .= "function ${RequestName}_Get(Url)\n";
+  $HTML .= "function {$RequestName}_Get(Url)\n";
   $HTML .= "{\n";
   $HTML .= "if (window.XMLHttpRequest)\n";
   $HTML .= "  {\n";
@@ -123,7 +110,7 @@ function ActiveHTTPscript($RequestName,$IncludeScriptTags=1)
 
   $HTML .= "if ($RequestName!=null)\n";
   $HTML .= "  {\n";
-  $HTML .= "  $RequestName.onreadystatechange=${RequestName}_Reply;\n";
+  $HTML .= "  $RequestName.onreadystatechange={$RequestName}_Reply;\n";
   /*
    'true' means asynchronous request.
   Rather than waiting for the reply, the reply is

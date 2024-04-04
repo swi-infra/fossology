@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- * Copyright (C) 2015, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\Plugin;
 
@@ -99,14 +88,15 @@ abstract class AgentPlugin implements Plugin
   /**
    * @param int $jobId
    * @param int $uploadId
-   * @param &string $errorMsg - error message on failure
+   * @param string $errorMsg - error message on failure
    * @param array $dependencies
    * @param string|null $jqargs (optional) jobqueue.jq_args
+   * @param $jq_cmd_args
    * @return
    * * jqId  Successfully queued
    * *   0   Not queued, latest version of agent has previously run successfully
    * *  -1   Not queued, error, error string in $ErrorMsg
-   **/
+   */
   protected function doAgentAdd($jobId, $uploadId, &$errorMsg, $dependencies, $jqargs = "", $jq_cmd_args = null)
   {
     $deps = array();
