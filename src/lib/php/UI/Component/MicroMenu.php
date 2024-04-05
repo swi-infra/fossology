@@ -1,4 +1,7 @@
 <?php
+# SPDX-FileCopyrightText: © Fossology contributors
+
+# SPDX-License-Identifier: GPL-2.0-only
 
 namespace Fossology\Lib\UI\Component;
 
@@ -63,6 +66,9 @@ class MicroMenu
 
   /**
    * @param $selectedFormat
+   * @param $pageNumber
+   * @param string $menuKey
+   * @param int $hexFactor
    * @return string
    */
   public function addFormatMenuEntries($selectedFormat, $pageNumber, $menuKey = self::VIEW, $hexFactor = 10)

@@ -1,27 +1,17 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
-Copyright (C) 2017 TNG Technology Consulting GmbH
-Authors: Andreas Würl, Steffen Weber, Maximilian Huber
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ SPDX-FileCopyrightText: © 2017 TNG Technology Consulting GmbH
+ Authors: Andreas Würl, Steffen Weber, Maximilian Huber
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
 
 use Fossology\Lib\Db\DbManager;
 use Monolog\Logger;
+use Fossology\Lib\Data\Tree\ItemTreeBounds;
 
 class TreeDao
 {
@@ -123,13 +113,13 @@ class TreeDao
 
   /**
    * @param int $uploadtreeId
-   * @return array with keys sha1, md5
+   * @return array with keys sha1, md5, sha256
    */
   public function getItemHashes($uploadtreeId, $uploadtreeTablename='uploadtree')
   {
     $pfile = $this->dbManager->getSingleRow("SELECT pfile.* FROM $uploadtreeTablename, pfile WHERE uploadtree_pk=$1 AND pfile_fk=pfile_pk",
         array($uploadtreeId), __METHOD__);
-    return array('sha1'=>$pfile['pfile_sha1'],'md5'=>$pfile['pfile_md5']);
+    return array('sha1'=>$pfile['pfile_sha1'],'md5'=>$pfile['pfile_md5'],'sha256'=>$pfile['pfile_sha256']);
   }
 
   public function getRepoPathOfPfile($pfileId, $repo="files")
@@ -143,5 +133,20 @@ class TreeDao
     $path = '';
     exec("$LIBEXECDIR/reppath $repo $hash", $path);
     return($path[0]);
+  }
+
+  /**
+   * Get the parent item of a given uploadtree item
+   * @param ItemTreeBounds $itemTreeBounds Item bounds to get parent for
+   * @return integer Item id of parent
+   */
+  public function getParentOfItem($itemTreeBounds)
+  {
+    $item = $itemTreeBounds->getItemId();
+    $tableName = $itemTreeBounds->getUploadTreeTableName();
+    $sql = "SELECT realparent FROM $tableName WHERE uploadtree_pk = $1;";
+    $statement = __METHOD__ . ".$tableName";
+    $row = $this->dbManager->getSingleRow($sql, [$item], $statement);
+    return $row['realparent'];
   }
 }

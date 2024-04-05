@@ -1,20 +1,10 @@
 <?php
 /*
-Copyright (C) 2014, Siemens AG
+ SPDX-FileCopyrightText: © 2014 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
+
 
 namespace Fossology\Monk\UI;
 
@@ -46,7 +36,7 @@ class OneShot extends DefaultPlugin
   {
     parent::__construct(self::NAME, array(
         self::TITLE => "One-Shot Monk",
-        self::MENU_LIST => "Upload::One-Shot Monk",
+        self::MENU_LIST => "Upload::One-Shot Monk Analysis",
         self::PERMISSION => Auth::PERM_WRITE,
         self::REQUIRES_LOGIN => true
     ));
@@ -75,7 +65,7 @@ class OneShot extends DefaultPlugin
     return $this->render('include/base.html.twig', $vars);
   }
 
-  public function scanMonkRendered($text)
+  public function scanMonkRendered($text, $fromRest = false)
   {
     $tmpFileName = tempnam("/tmp", "monk");
     if (!$tmpFileName) {
@@ -88,11 +78,14 @@ class OneShot extends DefaultPlugin
     unlink($tmpFileName);
 
     $this->highlightProcessor->addReferenceTexts($highlights);
+    if ($fromRest) {
+      return array($licenseIds, $highlights);
+    }
+
     $splitPositions = $this->highlightProcessor->calculateSplitPositions($highlights);
     $textFragment = new TextFragment(0, $text);
 
     $rendered = $this->textRenderer->renderText($textFragment, $splitPositions);
-
     return array($licenseIds, $rendered);
   }
 
@@ -156,10 +149,10 @@ class OneShot extends DefaultPlugin
     foreach (explode(',', $lineMatches['diff']) as $diff) {
       // t[0+4798] M0 s[0+4834]
       if (preg_match('/t\[(?P<start>[0-9]*)\+?(?P<len>[0-9]*)?\] M(?P<type>.?) s\[(?P<rf_start>[0-9]*)\+?(?P<rf_len>[0-9]*)?\]/', $diff, $diffMatches)) {
-        $start = $diffMatches['start'];
-        $end = $start + $diffMatches['len'];
+        $start = intval($diffMatches['start']);
+        $end = $start + intval($diffMatches['len']);
         $rfStart = intval($diffMatches['rf_start']);
-        $rfEnd = $rfStart + $diffMatches['rf_len'];
+        $rfEnd = $rfStart + intval($diffMatches['rf_len']);
 
         switch ($diffMatches['type']) {
           case '0':

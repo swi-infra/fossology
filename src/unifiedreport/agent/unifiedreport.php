@@ -1,21 +1,10 @@
 <?php
 /*
  Author: Shaheem Azmal, anupam.ghosh@siemens.com
- Copyright (C) 2017-2018, Siemens AG
+ SPDX-FileCopyrightText: © 2017-2018 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @dir
  * @brief Source for Unified report agent
@@ -34,7 +23,7 @@
  *     -# Common obligations, restrictions and risks
  *     -# Additional obligations, restrictions & risks beyond common rules
  * -# Acknowledgements
- *     Every acknowledgements entered by the user during clearing.
+ *     Every acknowledgement entered by the user during clearing.
  * -# Export Restrictions
  *     Contains findings of ECC.
  * -# Notes
@@ -101,18 +90,20 @@ define("REPORT_AGENT_NAME", "unifiedreport");
 use Fossology\Lib\Agent\Agent;
 use Fossology\Lib\Dao\UploadDao;
 use Fossology\Lib\Dao\UserDao;
-use Fossology\Lib\Report\LicenseClearedGetter;
-use Fossology\Lib\Report\LicenseIrrelevantGetter;
-use Fossology\Lib\Report\LicenseDNUGetter;
 use Fossology\Lib\Report\BulkMatchesGetter;
-use Fossology\Lib\Report\XpClearedGetter;
+use Fossology\Lib\Report\LicenseClearedGetter;
+use Fossology\Lib\Report\LicenseDNUGetter;
+use Fossology\Lib\Report\LicenseIrrelevantGetter;
 use Fossology\Lib\Report\LicenseMainGetter;
+use Fossology\Lib\Report\LicenseNonFunctionalGetter;
 use Fossology\Lib\Report\ObligationsGetter;
 use Fossology\Lib\Report\OtherGetter;
-use PhpOffice\PhpWord\PhpWord;
+use Fossology\Lib\Report\XpClearedGetter;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Shared\Html;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\SimpleType\JcTable;
+use PhpOffice\PhpWord\Style\Table;
 
 include_once(__DIR__ . "/version.php");
 include_once(__DIR__ . "/reportStatic.php");
@@ -134,12 +125,18 @@ class UnifiedReport extends Agent
    */
   private $licenseMainGetter;
 
-  /** @var cpClearedGetter $cpClearedGetter
+  /** @var XpClearedGetter $cpClearedGetter
    * Copyright clearance object
    */
   private $cpClearedGetter;
 
-  /** @var eccClearedGetter $eccClearedGetter
+
+  /** @var XpClearedGetter $ipraClearedGetter
+   * IP clearance object
+   */
+  private $ipraClearedGetter;
+
+  /** @var XpClearedGetter $eccClearedGetter
    * ECC clearance object
    */
   private $eccClearedGetter;
@@ -154,17 +151,22 @@ class UnifiedReport extends Agent
    */
   private $licenseDNUGetter;
 
+  /** @var LicenseNonFunctionalGetter $licenseNonFunctionalGetter
+   * LicenseNonFunctionalGetter object
+   */
+  private $licenseNonFunctionalGetter;
+
   /** @var BulkMatchesGetter $bulkMatchesGetter
    * BulkMatchesGetter object
    */
   private $bulkMatchesGetter;
 
-  /** @var licenseIrrelevantCommentGetter $licenseIrrelevantCommentGetter
+  /** @var LicenseIrrelevantGetter $licenseIrrelevantCommentGetter
    * licenseIrrelevantCommentGetter object
    */
   private $licenseIrrelevantCommentGetter;
 
-  /** @var obligationsGetter $obligationsGetter
+  /** @var ObligationsGetter $obligationsGetter
    * obligationsGetter object
    */
   private $obligationsGetter;
@@ -195,7 +197,9 @@ class UnifiedReport extends Agent
   private $tablestyle = array("borderSize" => 2,
                               "name" => "Arial",
                               "borderColor" => "000000",
-                              "cellSpacing" => 5
+                              "cellSpacing" => 5,
+                              "alignment"   => JcTable::START,
+                              "layout"      => Table::LAYOUT_FIXED
                              );
 
   /** @var array $subHeadingStyle
@@ -236,6 +240,7 @@ class UnifiedReport extends Agent
   function __construct()
   {
     $this->cpClearedGetter = new XpClearedGetter("copyright", "statement");
+    $this->ipraClearedGetter = new XpClearedGetter("ipra", "ipra");
     $this->eccClearedGetter = new XpClearedGetter("ecc", "ecc");
     $this->licenseClearedGetter = new LicenseClearedGetter();
     $this->licenseMainGetter = new LicenseMainGetter();
@@ -244,6 +249,8 @@ class UnifiedReport extends Agent
     $this->licenseIrrelevantCommentGetter = new LicenseIrrelevantGetter(false);
     $this->licenseDNUGetter = new LicenseDNUGetter();
     $this->licenseDNUCommentGetter = new LicenseDNUGetter(false);
+    $this->licenseNonFunctionalGetter = new LicenseNonFunctionalGetter();
+    $this->licenseNonFunctionalCommentGetter = new LicenseNonFunctionalGetter(false);
     $this->otherGetter = new OtherGetter();
     $this->obligationsGetter = new ObligationsGetter();
 
@@ -252,6 +259,7 @@ class UnifiedReport extends Agent
     $this->uploadDao = $this->container->get("dao.upload");
     $this->userDao = $this->container->get("dao.user");
   }
+
 
   /**
    * @copydoc Fossology::Lib::Agent::Agent::processUploadId()
@@ -264,47 +272,57 @@ class UnifiedReport extends Agent
 
     $this->heartbeat(0);
 
-    $licenses = $this->licenseClearedGetter->getCleared($uploadId, $groupId);
+    $licenses = $this->licenseClearedGetter->getCleared($uploadId, $this, $groupId, true, "license", false);
     $this->heartbeat(empty($licenses) ? 0 : count($licenses["statements"]));
 
-    $licensesMain = $this->licenseMainGetter->getCleared($uploadId, $groupId);
+    $licensesMain = $this->licenseMainGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licensesMain) ? 0 : count($licensesMain["statements"]));
 
     $licensesHist = $this->licenseClearedGetter->getLicenseHistogramForReport($uploadId, $groupId);
     $this->heartbeat(empty($licensesHist) ? 0 : count($licensesHist["statements"]));
 
-    $bulkLicenses = $this->bulkMatchesGetter->getCleared($uploadId, $groupId);
+    $bulkLicenses = $this->bulkMatchesGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($bulkLicenses) ? 0 : count($bulkLicenses["statements"]));
 
     $this->licenseClearedGetter->setOnlyAcknowledgements(true);
-    $licenseAcknowledgements = $this->licenseClearedGetter->getCleared($uploadId, $groupId);
+    $licenseAcknowledgements = $this->licenseClearedGetter->getCleared($uploadId, $this, $groupId, true, "license", false);
     $this->heartbeat(empty($licenseAcknowledgements) ? 0 : count($licenseAcknowledgements["statements"]));
 
     $this->licenseClearedGetter->setOnlyComments(true);
-    $licenseComments = $this->licenseClearedGetter->getCleared($uploadId, $groupId);
+    $licenseComments = $this->licenseClearedGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licenseComments) ? 0 : count($licenseComments["statements"]));
 
-    $licensesIrre = $this->licenseIrrelevantGetter->getCleared($uploadId, $groupId);
+    $licensesIrre = $this->licenseIrrelevantGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licensesIrre) ? 0 : count($licensesIrre["statements"]));
 
-    $licensesIrreComment = $this->licenseIrrelevantCommentGetter->getCleared($uploadId, $groupId);
+    $licensesIrreComment = $this->licenseIrrelevantCommentGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licensesIrreComment) ? 0 : count($licensesIrreComment["statements"]));
 
-    $licensesDNU = $this->licenseDNUGetter->getCleared($uploadId, $groupId);
+    $licensesDNU = $this->licenseDNUGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licensesDNU) ? 0 : count($licensesDNU["statements"]));
 
-    $licensesDNUComment = $this->licenseDNUCommentGetter->getCleared($uploadId, $groupId);
+    $licensesDNUComment = $this->licenseDNUCommentGetter->getCleared($uploadId, $this, $groupId, true, null, false);
     $this->heartbeat(empty($licensesDNUComment) ? 0 : count($licensesDNUComment["statements"]));
 
-    $copyrights = $this->cpClearedGetter->getCleared($uploadId, $groupId, true, "copyright", true);
-    $this->heartbeat(empty($copyrights["statements"]) ? 0 : count($copyrights["statements"]));
+    $licensesNonFunctional = $this->licenseNonFunctionalGetter->getCleared($uploadId, $this, $groupId, true, null, false);
+    $this->heartbeat(empty($licensesNonFunctional) ? 0 : count($licensesNonFunctional["statements"]));
 
-    $ecc = $this->eccClearedGetter->getCleared($uploadId, $groupId, true, "ecc");
+    $licensesNonFunctionalComment = $this->licenseNonFunctionalCommentGetter->getCleared($uploadId, $this, $groupId, true, null, false);
+    $this->heartbeat(empty($licensesNonFunctionalComment) ? 0 : count($licensesNonFunctionalComment["statements"]));
+
+    $copyrights = $this->cpClearedGetter->getCleared($uploadId, $this, $groupId, true, "copyright", true);
+    $this->heartbeat(empty($copyrights["scannerFindings"]) ? 0 : count($copyrights["scannerFindings"]) + count($copyrights["userFindings"]));
+
+    $ecc = $this->eccClearedGetter->getCleared($uploadId, $this, $groupId, true, "ecc", false);
     $this->heartbeat(empty($ecc) ? 0 : count($ecc["statements"]));
+
+    $ipra = $this->ipraClearedGetter->getCleared($uploadId, $this, $groupId, true, "ipra", false);
+    $this->heartbeat(empty($ip) ? 0 : count($ip["statements"]));
 
     $otherStatement = $this->otherGetter->getReportData($uploadId);
     $this->heartbeat(empty($otherStatement) ? 0 : count($otherStatement));
     $otherStatement['includeDNU'] = (count($licensesDNU["statements"]) > 0) ? true : false;
+    $otherStatement['includeNonFunctional'] = (count($licensesNonFunctional["statements"]) > 0) ? true : false;
 
     $contents = array(
                         "licenses" => $licenses,
@@ -313,10 +331,13 @@ class UnifiedReport extends Agent
                         "licenseComments" => $licenseComments,
                         "copyrights" => $copyrights,
                         "ecc" => $ecc,
+                        "ipra" => $ipra,
                         "licensesIrre" => $licensesIrre,
                         "licensesIrreComment" => $licensesIrreComment,
                         "licensesDNU" => $licensesDNU,
                         "licensesDNUComment" => $licensesDNUComment,
+                        "licensesNonFunctional" => $licensesNonFunctional,
+                        "licensesNonFunctionalComment" => $licensesNonFunctionalComment,
                         "licensesMain" => $licensesMain,
                         "licensesHist" => $licensesHist,
                         "otherStatement" => $otherStatement
@@ -390,14 +411,15 @@ class UnifiedReport extends Agent
    * @param Section $section
    * @param array $mainLicenses
    * @param array $titleSubHeading
+   * @param $heading
    */
-  private function globalLicenseTable(Section $section, $mainLicenses, $titleSubHeading)
+  private function globalLicenseTable(Section $section, $mainLicenses, $titleSubHeading, $heading)
   {
     $firstColLen = 2000;
     $secondColLen = 9500;
     $thirdColLen = 4000;
 
-    $section->addTitle(htmlspecialchars("Main Licenses"), 2);
+    $section->addTitle(htmlspecialchars($heading), 2);
     $section->addText($titleSubHeading, $this->subHeadingStyle);
 
     $table = $section->addTable($this->tablestyle);
@@ -415,7 +437,8 @@ class UnifiedReport extends Agent
         $cell1->addText(htmlspecialchars($licenseMain["content"], ENT_DISALLOWED), $this->licenseColumn, "pStyle");
         $cell2 = $table->addCell($secondColLen);
         // replace new line character
-        $licenseText = str_replace("\n", "<w:br/>\n", htmlspecialchars($licenseMain["text"], ENT_DISALLOWED));
+        $licenseText = str_replace("\n", "</w:t>\n<w:br />\n<w:t xml:space=\"preserve\">", htmlspecialchars($licenseMain["text"], ENT_DISALLOWED));
+        $licenseText = str_replace("\r", "", $licenseText);
         $cell2->addText($licenseText, $this->licenseTextColumn, "pStyle");
         if (!empty($licenseMain["files"])) {
           $cell3 = $table->addCell($thirdColLen, $styleColumn);
@@ -458,13 +481,14 @@ class UnifiedReport extends Agent
     if (!empty($licenses)) {
       foreach ($licenses as $licenseStatement) {
         $table->addRow($this->rowHeight);
-        $cell1 = $table->addCell($firstColLen, null, "pStyle");
+        $cell1 = $table->addCell($firstColLen, "pStyle");
         $cell1->addText(htmlspecialchars($licenseStatement["content"], ENT_DISALLOWED), $this->licenseColumn, "pStyle");
         $cell2 = $table->addCell($secondColLen, "pStyle");
         // replace new line character
-        $licenseText = str_replace("\n", "<w:br/>\n", htmlspecialchars($licenseStatement["text"], ENT_DISALLOWED));
+        $licenseText = str_replace("\n", "</w:t>\n<w:br />\n<w:t xml:space=\"preserve\">", htmlspecialchars($licenseStatement["text"], ENT_DISALLOWED));
+        $licenseText = str_replace("\r", "", $licenseText);
         $cell2->addText($licenseText, $this->licenseTextColumn, "pStyle");
-        $cell3 = $table->addCell($thirdColLen, null, "pStyle");
+        $cell3 = $table->addCell($thirdColLen, "pStyle");
         asort($licenseStatement["files"]);
         foreach ($licenseStatement["files"] as $fileName) {
           $cell3->addText(htmlspecialchars($fileName), $this->filePathColumn, "pStyle");
@@ -507,7 +531,8 @@ class UnifiedReport extends Agent
           $cell1->addText(htmlspecialchars($licenseStatement["content"], ENT_DISALLOWED), $this->licenseColumn, "pStyle");
           $cell2 = $table->addCell($secondColLen);
           // replace new line character
-          $licenseText = str_replace("\n", "<w:br/>\n", htmlspecialchars($licenseStatement["text"], ENT_DISALLOWED));
+          $licenseText = str_replace("\n", "</w:t>\n<w:br />\n<w:t xml:space=\"preserve\">", htmlspecialchars($licenseStatement["text"], ENT_DISALLOWED));
+          $licenseText = str_replace("\r", "", $licenseText);
           $cell2->addText($licenseText, $this->licenseTextColumn, "pStyle");
           $cell3 = $table->addCell($thirdColLen, $riskarray['color']);
           asort($licenseStatement["files"]);
@@ -589,6 +614,7 @@ class UnifiedReport extends Agent
     $firstColLen = 5000;
     $secondColLen = 5000;
     $thirdColLen = 5000;
+    $rowWidth = 200;
 
     $section->addTitle(htmlspecialchars($title), 2);
     $section->addText($titleSubHeading, $this->subHeadingStyle);
@@ -619,14 +645,15 @@ class UnifiedReport extends Agent
    * @param Section $section
    * @param array $dataHistogram
    * @param array $titleSubHeading
+   * @param $heading
    */
-  private function licenseHistogram(Section $section, $dataHistogram, $titleSubHeading)
+  private function licenseHistogram(Section $section, $dataHistogram, $titleSubHeading, $heading)
   {
     $firstColLen = 2000;
     $secondColLen = 2000;
     $thirdColLen = 5000;
 
-    $section->addTitle(htmlspecialchars("Results of License Scan"), 2);
+    $section->addTitle(htmlspecialchars($heading), 2);
     $section->addText($titleSubHeading, $this->subHeadingStyle);
 
     $table = $section->addTable($this->tablestyle);
@@ -676,12 +703,14 @@ class UnifiedReport extends Agent
     $phpWord = new PhpWord();
 
     /* Get start time */
-    $jobInfo = $this->dbManager->getSingleRow("SELECT extract(epoch from jq_starttime) "
+    $jobInfo = $this->dbManager->getSingleRow("SELECT extract(epoch FROM jq_starttime) "
               ." AS ts, jq_cmd_args FROM jobqueue WHERE jq_job_fk=$1", array($this->jobId));
     $timestamp = $jobInfo['ts'];
     $packageUri = "";
     if (!empty($jobInfo['jq_cmd_args'])) {
-      $packageUri = trim($jobInfo['jq_cmd_args'])."?mod=showjobs&upload=".$uploadId;
+      $packageUri = trim($jobInfo['jq_cmd_args']);
+      $packageUri = preg_replace("/api\/.*/i", "", $packageUri); // Remove api/v1/report
+      $packageUri .= "?mod=showjobs&upload=" . $uploadId;
     }
 
     /* Applying document properties and styling */
@@ -702,117 +731,213 @@ class UnifiedReport extends Agent
     list($contents['licensesMain']['statements'], $contents['licenses']['statements']) = $this->licenseClearedGetter->updateIdentifiedGlobalLicenses($contents['licensesMain']['statements'], $contents['licenses']['statements']);
 
     /* Summery table */
+    $assignedToUserId = $this->uploadDao->getAssignee($uploadId, $groupId);
+    if ($assignedToUserId != 1) {
+      $assignedToUserName = $this->userDao->getUserName($assignedToUserId);
+    } else {
+      $assignedToUserName = "";
+    }
     $reportSummarySection->summaryTable($section, $uploadId, $userName,
       $contents['licensesMain']['statements'], $contents['licenses']['statements'],
-      $contents['licensesHist']['statements'], $contents['otherStatement'], $timestamp, $groupName, $packageUri);
+      $contents['licensesHist']['statements'], $contents['otherStatement'], $timestamp, $groupName, $packageUri, $assignedToUserName);
 
-    /* Assessment summery table */
-    $bookMarkCell = $reportStaticSection->assessmentSummaryTable($section, $contents['otherStatement']);
+    if (!empty($contents['otherStatement']['ri_unifiedcolumns'])) {
+      $unifiedColumns = (array) json_decode($contents['otherStatement']['ri_unifiedcolumns'], true);
+    } else {
+      $unifiedColumns = UploadDao::UNIFIED_REPORT_HEADINGS;
+    }
 
-    /* Todoinfo table */
-    $reportStaticSection->todoTable($section);
+    $heading = array_keys($unifiedColumns['assessment'])[0];
+    $isEnabled = array_values($unifiedColumns['assessment'])[0];
+    if ($isEnabled) {
+      /* Assessment summery table */
+      $bookMarkCell = $reportStaticSection->assessmentSummaryTable($section, $contents['otherStatement'], $heading);
+    }
 
-    /* Todoobligation table */
-    $reportStaticSection->todoObliTable($section, $obligations);
+    $heading = array_keys($unifiedColumns['compliancetasks'])[0];
+    $isEnabled = array_values($unifiedColumns['compliancetasks'])[0];
+    if ($isEnabled) {
+      /* Todoinfo table */
+      $reportStaticSection->todoTable($section, $heading);
+      /* Todoobligation table */
+      $reportStaticSection->todoObliTable($section, $obligations);
+    }
 
-    /* Display acknowledgement */
-    $heading = "Acknowledgements";
-    $titleSubHeadingAcknowledgement = "(Reference to the license, Text of acknowledgements, File path)";
-    $this->bulkLicenseTable($section, $heading, $contents['licenseAcknowledgements']['statements'], $titleSubHeadingAcknowledgement);
+    $heading = array_keys($unifiedColumns['acknowledgements'])[0];
+    $isEnabled = array_values($unifiedColumns['acknowledgements'])[0];
+    if ($isEnabled) {
+      /* Display acknowledgement */
+      $titleSubHeadingAcknowledgement = "(Reference to the license, Text of acknowledgements, File path)";
+      $this->bulkLicenseTable($section, $heading, $contents['licenseAcknowledgements']['statements'], $titleSubHeadingAcknowledgement);
+    }
 
-    /* Display Ecc statements and files */
-    $heading = "Export Restrictions";
-    $titleSubHeadingCEI = "(Statements, Comments, File path)";
-    $section->addBookmark("eccInternalLink");
-    $textEcc ="The content of this paragraph is not the result of the evaluation"
-             ." of the export control experts (the ECCN). It contains information"
-             ." found by the scanner which shall be taken in consideration by"
-             ." the export control experts during the evaluation process. If"
-             ." the scanner identifies an ECCN it will be listed here. (NOTE:"
-             ." The ECCN is seen as an attribute of the component release and"
-             ." thus it shall be present in the component catalogue.";
-    $this->getRowsAndColumnsForCEI($section, $heading, $contents['ecc']['statements'], $titleSubHeadingCEI, $textEcc);
+    $heading = array_keys($unifiedColumns['exportrestrictions'])[0];
+    $isEnabled = array_values($unifiedColumns['exportrestrictions'])[0];
+    if ($isEnabled) {
+      /* Display Ecc statements and files */
+      $titleSubHeadingCEI = "(Statements, Comments, File path)";
+      $section->addBookmark("eccInternalLink");
+      $textEcc ="The content of this paragraph is not the result of the evaluation"
+               ." of the export control experts (the ECCN). It contains information"
+               ." found by the scanner which shall be taken in consideration by"
+               ." the export control experts during the evaluation process. If"
+               ." the scanner identifies an ECCN it will be listed here. (NOTE:"
+               ." The ECCN is seen as an attribute of the component release and"
+               ." thus it shall be present in the component catalogue.";
+      $this->getRowsAndColumnsForCEI($section, $heading, $contents['ecc']['statements'], $titleSubHeadingCEI, $textEcc);
+    }
 
-    /* Display comments entered for report */
-    $heading = "Notes";
-    $subHeading = "Notes on individual files";
-    $reportStaticSection->notes($section, $heading, $subHeading);
-    $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
-    $this->bulkLicenseTable($section, "", $contents['licenseComments']['statements'], $titleSubHeadingNotes);
+    $heading = array_keys($unifiedColumns['intellectualProperty'])[0];
+    $isEnabled = array_values($unifiedColumns['intellectualProperty'])[0];
+    if ($isEnabled) {
+      /* Display IPRA statements and files */
+      $heading = "Patent Relevant Statements";
+      $textIpra = "The content of this paragraph is not the result of the evaluation of the IP professionals. It contains information found by the scanner which shall be taken in consideration by the IP professionals during the evaluation process.";
+      $this->getRowsAndColumnsForCEI($section, $heading, $contents['ipra']['statements'], $titleSubHeadingCEI, $textIpra);
+    }
 
-    /* Display scan results and edited results */
-    $titleSubHeadingHistogram = "(Scanner count, Concluded license count, License name)";
-    $this->licenseHistogram($section, $contents['licensesHist']['statements'], $titleSubHeadingHistogram);
+    $heading = array_keys($unifiedColumns['notes'])[0];
+    $isEnabled = array_values($unifiedColumns['notes'])[0];
+    if ($isEnabled) {
+      /* Display comments entered for report */
+      $subHeading = "Notes on individual files";
+      $reportStaticSection->notes($section, $heading, $subHeading);
+      $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
+      $this->bulkLicenseTable($section, "", $contents['licenseComments']['statements'], $titleSubHeadingNotes);
+    }
 
-    /* Display global licenses */
-    $titleSubHeadingLicense = "(License name, License text, File path)";
-    $this->globalLicenseTable($section, $contents['licensesMain']['statements'], $titleSubHeadingLicense);
+    $heading = array_keys($unifiedColumns['scanresults'])[0];
+    $isEnabled = array_values($unifiedColumns['scanresults'])[0];
+    if ($isEnabled) {
+      /* Display scan results and edited results */
+      $titleSubHeadingHistogram = "(Scanner count, Concluded license count, License name)";
+      $this->licenseHistogram($section, $contents['licensesHist']['statements'], $titleSubHeadingHistogram, $heading);
+    }
 
-    /* Display licenses(red) name,text and files */
-    $heading = "Other OSS Licenses (red) - specific obligations";
-    $redLicense = array("color" => array("bgColor" => "F9A7B0"), "riskLevel" => array("5", "4"));
-    $this->licensesTable($section, $heading, $contents['licenses']['statements'], $redLicense, $titleSubHeadingLicense);
+    $heading = array_keys($unifiedColumns['mainlicenses'])[0];
+    $isEnabled = array_values($unifiedColumns['mainlicenses'])[0];
+    if ($isEnabled) {
+      /* Display global licenses */
+      $titleSubHeadingLicense = "(License name, License text, File path)";
+      $this->globalLicenseTable($section, $contents['licensesMain']['statements'], $titleSubHeadingLicense, $heading);
+    }
 
-    /* Display licenses(yellow) name,text and files */
-    $heading = "Other OSS Licenses (yellow) - additional obligations to common rules (e.g. copyleft)";
-    $yellowLicense = array("color" => array("bgColor" => "FEFF99"), "riskLevel" => array("3", "2"));
-    $this->licensesTable($section, $heading, $contents['licenses']['statements'], $yellowLicense, $titleSubHeadingLicense);
+    $heading = array_keys($unifiedColumns['redlicense'])[0];
+    $isEnabled = array_values($unifiedColumns['redlicense'])[0];
+    if ($isEnabled) {
+      /* Display licenses(red) name,text and files */
+      $redLicense = array("color" => array("bgColor" => "F9A7B0"), "riskLevel" => array("5", "4"));
+      $this->licensesTable($section, $heading, $contents['licenses']['statements'], $redLicense, $titleSubHeadingLicense);
+    }
 
-    /* Display licenses(white) name,text and files */
-    $heading = "Other OSS Licenses (white) - only common rules";
-    $whiteLicense = array("color" => array("bgColor" => "FFFFFF"), "riskLevel" => array("", "0", "1"));
-    $this->licensesTable($section, $heading, $contents['licenses']['statements'], $whiteLicense, $titleSubHeadingLicense);
+    $heading = array_keys($unifiedColumns['yellowlicense'])[0];
+    $isEnabled = array_values($unifiedColumns['yellowlicense'])[0];
+    if ($isEnabled) {
+      /* Display licenses(yellow) name,text and files */
+      $yellowLicense = array("color" => array("bgColor" => "FEFF99"), "riskLevel" => array("3", "2"));
+      $this->licensesTable($section, $heading, $contents['licenses']['statements'], $yellowLicense, $titleSubHeadingLicense);
+    }
 
-    $heading = "Overview of All Licenses with or without Obligations";
-    $titleSubHeadingObli = "(License ShortName, Obligation)";
-    $reportStaticSection->allLicensesWithAndWithoutObligations($section, $heading, $obligations, $whiteLists, $titleSubHeadingObli);
+    $heading = array_keys($unifiedColumns['whitelicense'])[0];
+    $isEnabled = array_values($unifiedColumns['whitelicense'])[0];
+    if ($isEnabled) {
+      /* Display licenses(white) name,text and files */
+      $whiteLicense = array("color" => array("bgColor" => "FFFFFF"), "riskLevel" => array("", "0", "1"));
+      $this->licensesTable($section, $heading, $contents['licenses']['statements'], $whiteLicense, $titleSubHeadingLicense);
+    }
 
-    /* Display copyright statements and files */
-    $heading = "Copyrights";
-    $this->getRowsAndColumnsForCEI($section, $heading, $contents['copyrights']['scannerFindings'], $titleSubHeadingCEI);
+    $heading = array_keys($unifiedColumns['overviewwithwithoutobligations'])[0];
+    $isEnabled = array_values($unifiedColumns['overviewwithwithoutobligations'])[0];
+    if ($isEnabled) {
+      $titleSubHeadingObli = "(License ShortName, Obligation)";
+      $reportStaticSection->allLicensesWithAndWithoutObligations($section, $heading, $obligations, $whiteLists, $titleSubHeadingObli);
+    }
 
-    /* Display user findings copyright statements and files */
-    $heading = "Copyrights (User Findings)";
-    $this->getRowsAndColumnsForCEI($section, $heading, $contents['copyrights']['userFindings'], $titleSubHeadingCEI);
+    $heading = array_keys($unifiedColumns['copyrights'])[0];
+    $isEnabled = array_values($unifiedColumns['copyrights'])[0];
+    if ($isEnabled) {
+      /* Display copyright statements and files */
+      $this->getRowsAndColumnsForCEI($section, $heading, $contents['copyrights']['scannerFindings'], $titleSubHeadingCEI);
+    }
 
-    /* Display Bulk findings name,text and files */
-    $heading = "Bulk Findings";
-    $this->bulkLicenseTable($section, $heading, $contents['bulkLicenses']['statements'], $titleSubHeadingLicense);
+    $heading = array_keys($unifiedColumns['copyrightsuf'])[0];
+    $isEnabled = array_values($unifiedColumns['copyrightsuf'])[0];
+    if ($isEnabled) {
+      /* Display user findings copyright statements and files */
+      $this->getRowsAndColumnsForCEI($section, $heading, $contents['copyrights']['userFindings'], $titleSubHeadingCEI);
+    }
 
-    /* Display NON-Functional Licenses license files */
-    $heading = "Non-Functional Licenses";
-    $reportStaticSection->getNonFunctionalLicenses($section, $heading);
+    $heading = array_keys($unifiedColumns['bulkfindings'])[0];
+    $isEnabled = array_values($unifiedColumns['bulkfindings'])[0];
+    if ($isEnabled) {
+      /* Display Bulk findings name,text and files */
+      $this->bulkLicenseTable($section, $heading, $contents['bulkLicenses']['statements'], $titleSubHeadingLicense);
+    }
 
-    /* Display irrelavant license files */
-    $heading = "Irrelevant Files";
-    $titleSubHeadingIrre = "(Path, Files, Licenses)";
-    $this->getRowsAndColumnsForIrre($section, $heading, $contents['licensesIrre']['statements'], $titleSubHeadingIrre);
+    $heading = array_keys($unifiedColumns['licensenf'])[0];
+    $isEnabled = array_values($unifiedColumns['licensenf'])[0];
+    if ($isEnabled) {
+      /* Display NON-Functional Licenses license files */
+      $reportStaticSection->getNonFunctionalLicenses($section, $heading);
+    }
 
-    /* Display irrelavant file license comment  */
-    $subHeading = "Comment for Irrelevant files";
-    $section->addTitle(htmlspecialchars("$subHeading"), 3);
-    $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
-    $this->bulkLicenseTable($section, "", $contents['licensesIrreComment']['statements'], $titleSubHeadingNotes);
+    $heading = array_keys($unifiedColumns['irrelevantfiles'])[0];
+    $isEnabled = array_values($unifiedColumns['irrelevantfiles'])[0];
+    if ($isEnabled) {
+      /* Display irrelavant license files */
+      $titleSubHeadingIrre = "(Path, Files, Licenses)";
+      $this->getRowsAndColumnsForIrre($section, $heading, $contents['licensesIrre']['statements'], $titleSubHeadingIrre);
 
-    /* Display Do not use license files */
-    $heading = "Do not use Files";
-    if ($contents['otherStatement']['includeDNU']) {
+      /* Display irrelavant file license comment  */
+      $subHeading = "Comment for Irrelevant files";
+      $section->addTitle(htmlspecialchars("$subHeading"), 3);
+      $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
+      $this->bulkLicenseTable($section, "", $contents['licensesIrreComment']['statements'], $titleSubHeadingNotes);
+    }
+
+    $heading = array_keys($unifiedColumns['dnufiles'])[0];
+    $isEnabled = array_values($unifiedColumns['dnufiles'])[0];
+    if ($isEnabled) {
+      /* Display Do not use license files */
+      if ($contents['otherStatement']['includeDNU']) {
+        // adding an internal bookmark
+        $columnStyleWithUnderline = array("size" => 11, "color" => "0000A0", 'underline' => 'single');
+        $section->addBookmark('DNUBookmark');
+        $bookMarkCell->addLink('DNUBookmark', htmlspecialchars(' NOTE: DO NOT USE files found! Please check Do not use files section', ENT_COMPAT, 'UTF-8'), $columnStyleWithUnderline, "pStyle", true);
+      }
+      $titleSubHeadingIrre = "(Path, Files, Licenses)";
+      $this->getRowsAndColumnsForIrre($section, $heading, $contents['licensesDNU']['statements'], $titleSubHeadingIrre);
+
+      /* Display Do not use file license comment  */
+      $subHeading = "Comment for Do not use files";
+      $section->addTitle(htmlspecialchars("$subHeading"), 3);
+      $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
+      $this->bulkLicenseTable($section, "", $contents['licensesDNUComment']['statements'], $titleSubHeadingNotes);
+    }
+
+    /* Display Non functional license files */
+    $heading = "Non functional Files";
+    if ($contents['otherStatement']['includeNonFunctional']) {
       // adding an internal bookmark
       $columnStyleWithUnderline = array("size" => 11, "color" => "0000A0", 'underline' => 'single');
-      $section->addBookmark('DNUBookmark');
-      $bookMarkCell->addLink('DNUBookmark', htmlspecialchars(' NOTE: DO NOT USE files found! Please check Do not use files section', ENT_COMPAT, 'UTF-8'), $columnStyleWithUnderline, "pStyle", true);
+      $section->addBookmark('nonFunctionalBookmark');
+      $bookMarkCell->addLink('nonFunctionalBookmark', htmlspecialchars(' NOTE: Non functional files found! Please check Non functional files section', ENT_COMPAT, 'UTF-8'), $columnStyleWithUnderline, "pStyle", true);
     }
     $titleSubHeadingIrre = "(Path, Files, Licenses)";
-    $this->getRowsAndColumnsForIrre($section, $heading, $contents['licensesDNU']['statements'], $titleSubHeadingIrre);
+    $this->getRowsAndColumnsForIrre($section, $heading, $contents['licensesNonFunctional']['statements'], $titleSubHeadingIrre);
 
-    /* Display Do not use file license comment  */
-    $subHeading = "Comment for Do not use files";
+    /* Display Non functional file license comment  */
+    $subHeading = "Comment for Non functional files";
     $section->addTitle(htmlspecialchars("$subHeading"), 3);
     $titleSubHeadingNotes = "(License name, Comment Entered, File path)";
-    $this->bulkLicenseTable($section, "", $contents['licensesDNUComment']['statements'], $titleSubHeadingNotes);
+    $this->bulkLicenseTable($section, "", $contents['licensesNonFunctionalComment']['statements'], $titleSubHeadingNotes);
 
-    /* clearing protocol change log table */
-    $reportStaticSection->clearingProtocolChangeLogTable($section);
+    $heading = array_keys($unifiedColumns['changelog'])[0];
+    $isEnabled = array_values($unifiedColumns['changelog'])[0];
+    if ($isEnabled) {
+      /* clearing protocol change log table */
+      $reportStaticSection->clearingProtocolChangeLogTable($section, $heading);
+    }
 
     /* Footer starts */
     $reportStaticSection->reportFooter($phpWord, $section, $contents['otherStatement']);

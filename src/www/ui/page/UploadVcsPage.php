@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Page;
 
@@ -43,6 +32,7 @@ class UploadVcsPage extends UploadPageBase
 
   /**
    * @param Request $request
+   * @param $vars
    * @return Response
    */
   protected function handleView(Request $request, $vars)
@@ -51,9 +41,8 @@ class UploadVcsPage extends UploadPageBase
     $vars['usernameField'] = 'username';
     $vars['passwdField'] = 'passwd';
     $vars['geturlField'] = self::GETURL_PARAM;
+    $vars['branchField'] = 'branch';
     $vars['nameField'] = 'name';
-    $this->renderer->clearTemplateCache();
-    $this->renderer->clearCacheFiles();
     return $this->render("upload_vcs.html.twig", $this->mergeWithDefault($vars));
   }
 
@@ -91,6 +80,7 @@ class UploadVcsPage extends UploadPageBase
       $text = _("Invalid Folder.");
       return array(false, $text, $description);
     }
+    $setGlobal = ($request->get('globalDecisions')) ? 1 : 0;
 
     $public = $request->get('public');
     $publicPermission = ($public == self::PUBLIC_ALL) ? Auth::PERM_READ : Auth::PERM_NONE;
@@ -109,7 +99,7 @@ class UploadVcsPage extends UploadPageBase
     $userId = Auth::getUserId();
     $groupId = Auth::getGroupId();
     $uploadId = JobAddUpload($userId, $groupId, $ShortName, $getUrl,
-      $description, $uploadMode, $folderId, $publicPermission);
+      $description, $uploadMode, $folderId, $publicPermission, $setGlobal);
     if (empty($uploadId)) {
       $text = _("Failed to insert upload record");
       return array(false, $text, $description);
@@ -135,7 +125,12 @@ class UploadVcsPage extends UploadPageBase
     $Passwd = trim($request->get('passwd'));
     $Passwd = $this->basicShEscaping($Passwd);
     if (!empty($Passwd)) {
-      $jq_args .= "--password $Passwd";
+      $jq_args .= "--password $Passwd ";
+    }
+
+    $Branch = trim(explode(' ',trim($request->get('branch')))[0]);
+    if (!empty($Branch) && strcasecmp($VCSType,'git') == 0) {
+      $jq_args .= "--single-branch --branch '$Branch'";
     }
 
     $jobqueuepk = JobQueueAdd($jobpk, "wget_agent", $jq_args, NULL, NULL);
@@ -157,20 +152,8 @@ class UploadVcsPage extends UploadPageBase
       return array(false, _($ErrorMsg), $description);
     }
 
-    AgentCheckBoxDo($jobpk, $uploadId);
-
-    $msg = "";
-    /** check if the scheudler is running */
-    $status = GetRunnableJobList();
-    if (empty($status)) {
-      $msg .= _("Is the scheduler running? ");
-    }
-    $Url = Traceback_uri() . "?mod=showjobs&upload=$uploadId";
-    $text = _("The upload");
-    $text1 = _("has been queued. It is");
-    $msg .= "$text $Name $text1 ";
-    $keep =  "<a href='$Url'>upload #" . $uploadId . "</a>.\n";
-    return array(true, $msg.$keep, $description, $uploadId);
+    $message = $this->postUploadAddJobs($request, $Name, $uploadId, $jobpk);
+    return array(true, $message, $description, $uploadId);
   }
 }
 

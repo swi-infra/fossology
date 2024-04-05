@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2011 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * \brief Create UI users for tests to use.
@@ -103,7 +92,7 @@ class createUIUsers extends fossologyTestCase {
     print "Using Svn Version:$Svn\n";
     foreach($Users as $user => $params) {
       list($description, $email, $access, $folder,
-      $block, $blank, $password, $Enote, $bucket, $ui ) = split(',',$Users[$user]);
+      $block, $blank, $password, $Enote, $bucket, $ui ) = explode(',',$Users[$user]);
       $added = $this->addUser($user, $description, $email, $access, $folder,
         $password, $Enote, $bucket, $ui);
       if(preg_match('/User already exists/',$added, $matches)) {
@@ -116,4 +105,3 @@ class createUIUsers extends fossologyTestCase {
     }
   }
 }
-?>

@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2012-2013 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2012-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Perform a one-shot license analysis on multiple files
@@ -41,7 +30,7 @@ class OneShotMultiFileTest extends CommonCliTest
    * Mapping of files => expected result
    */
   public $Results = array(
-    'Affero-v1.0' => 'AGPL-1.0',
+    'Affero-v1.0' => 'AGPL-1.0-only',
     'Apache-v1.1' => 'Apache-1.1',
   	'ApacheLicense-v2.0' => 'Apache-2.0',
   	'ApacheV2.0.gz' => 'No_license_found',
@@ -71,16 +60,16 @@ class OneShotMultiFileTest extends CommonCliTest
     'BSD_style_x.txt' => 'BSD-style,Govt-work',
     'BSD_style_y.txt' => 'PHP-3.0',
     'BSD_style_z.txt' => 'OLDAP-2.3',
-  	'FILEgpl3.0' => 'GPL-3.0+',
-  	'FILEgplv2.1' => 'LGPL-2.1+',
+  	'FILEgpl3.0' => 'GPL-3.0-only',
+  	'FILEgplv2.1' => 'LGPL-2.1-only',
   	'OSIzlibLicense-2006-10-31' => 'Zlib',
   	'RCSL_v3.0_a.txt' => 'Dual-license,RCSL-3.0',
   	'RPSL_v1.0_a.txt' => 'RPSL-1.0',
   	'RPSL_v1.0_b.txt' => 'RPSL-1.0',
-  	'agpl-3.0.txt' => 'AGPL-3.0',
+  	'agpl-3.0.txt' => 'AGPL-3.0-only',
   	'apple.lic' => 'APSL-2.0',
-  	'gpl-3.0.txt' => 'GPL-3.0+',
-  	'gplv2.1' => 'LGPL-2.1+',
+  	'gpl-3.0.txt' => 'GPL-3.0-only',
+  	'gplv2.1' => 'LGPL-2.1-only',
   	'zlibLicense-1.2.2-2004-Oct-03' => 'Zlib',
   	'DNSDigest.c' => 'Apache-2.0,BSD-style,GPL',
   	'Oracle-Berkeley-DB.java' => 'Oracle-Berkeley-DB',
@@ -112,7 +101,7 @@ class OneShotMultiFileTest extends CommonCliTest
       $this->assertArrayHasKey($fileName, $this->Results,
         "Failure, filename $fileName was not found in the master results\n");
       $expected  = $this->Results[$fileName];
-      $this->assertContains($licenses, $expected,
+      $this->assertStringContainsString($licenses, $expected,
         "Failure, Master results $expected \n do not match current results $licenses \n");
     }
   }

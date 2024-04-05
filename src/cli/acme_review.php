@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2012 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 define("TITLE_ACME_REVIEW", _("ACME Review"));
 
@@ -232,7 +221,7 @@ class acme_review extends FO_Plugin
       $ProjectListURL = Traceback_uri() . "?mod=" . $this->Name . "&acme_project=$project[acme_project_pk]&upload=$upload_pk";
       $Outbuf .= "<td><a href='$ProjectListURL'>$project[count]</a></td>";
       $Outbuf .= "<td><a href='$project[url]'>$project[url]</a></td>";
-      $Outbuf .= "<td>" . htmlentities($project['description']) . "</td>";
+      $Outbuf .= "<td>" . htmlentities($project['description'], ENT_HTML5 | ENT_QUOTES) . "</td>";
       $Outbuf .= "<td>$project[licenses]</td>";
       $Outbuf .= "<td>$project[version]</td>";
       $Outbuf .= "</tr>";
@@ -442,14 +431,10 @@ class acme_review extends FO_Plugin
     }
 
     switch ($this->OutputType) {
-      case "XML":
-        break;
       case "HTML":
         $this->NoHeader = 0;
         $this->OutputOpen("HTML", 1);
         $V .= $this->HTMLForm($acme_project_array, $upload_pk);
-        break;
-      case "Text":
         break;
       default:
         break;

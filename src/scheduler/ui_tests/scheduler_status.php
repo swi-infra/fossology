@@ -1,4 +1,9 @@
 <?php
+/*
+ SPDX-FileCopyrightText: © Fossology contributors
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Test scheduler connection and status
@@ -40,4 +45,3 @@ while ($buf = socket_read($sock, 2048, PHP_NORMAL_READ))
 
 echo "Closing socket<br>";
 socket_close($sock);
-?>

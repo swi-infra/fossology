@@ -1,21 +1,10 @@
 <?php
 /*
- Copyright (C) 2008-2014 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2014-2015, 2018 Siemens AG
+ SPDX-FileCopyrightText: © 2008-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2015, 2018 Siemens AG
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- */
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * @file
@@ -85,14 +74,13 @@ class fo_libschema
    * Apply or echo the SQL statement based on the debugging status.
    * @param string $sql  Statement to be applied
    * @param string $stmt Name of the statement (for caching)
-   * @return DB result
    */
   function applyOrEchoOnce($sql, $stmt = '')
   {
     if ($this->debug) {
       print ("$sql\n");
     } else {
-      return $this->dbman->queryOnce($sql, $stmt);
+      $this->dbman->queryOnce($sql, $stmt);
     }
   }
 
@@ -131,10 +119,30 @@ class fo_libschema
       }
     }
 
+    $sql_statement = "select extname from pg_extension where extname = 'uuid-ossp'";
+
+    $result = pg_query($PG_CONN, $sql_statement);
+    if (!$result) {
+      throw new Exception("Could not check the database for uuid-ossp extension");
+    }
+
+    $uuid_already_installed = false;
+    if ( pg_fetch_row($result) ) {
+      $uuid_already_installed = true;
+    }
+
+    // then create extension uuid-ossp if not already created
+    if ( $uuid_already_installed == false ) {
+      $sql_statement = 'CREATE EXTENSION "uuid-ossp";';
+      $result = pg_query($PG_CONN, $sql_statement);
+      if (!$result) {
+        throw new Exception("Could not create uuid-ossp extension in the database");
+      }
+    }
+
     $this->debug = $debug;
     if (!file_exists($filename)) {
-      $errMsg = "$filename does not exist.";
-      return $errMsg;
+      return "$filename does not exist.";
     }
     $Schema = array(); /* will be filled in next line */
     require($filename); /* this cause Fatal Error if the file does not exist. */
@@ -144,8 +152,7 @@ class fo_libschema
     if ((count($this->schema['TABLE']) < 5) || (count($this->schema['SEQUENCE']) < 5)
         || (count($this->schema['INDEX']) < 5) || (count($this->schema['CONSTRAINT']) < 5)
     ) {
-      $errMsg = "Schema from '$filename' appears invalid.";
-      return $errMsg;
+      return "Schema from '$filename' appears invalid.";
     }
 
     if (!$debug) {
@@ -160,6 +167,7 @@ class fo_libschema
     $this->applySequences();
     $this->applyTables();
     $this->applyInheritedRelations();
+    $this->getCurrSchema(); /* New tables created, recheck */
     $this->applyTables(true);
     $this->updateSequences();
     $this->applyViews();
@@ -247,7 +255,8 @@ class fo_libschema
    */
   function updateSequences()
   {
-    if (empty($this->schema['SEQUENCE'])) {
+    if (empty($this->schema['SEQUENCE']) ||
+        !(array_key_exists('SEQUENCE', $this->currSchema))) {
       return;
     }
     foreach ($this->schema['SEQUENCE'] as $name => $import) {
@@ -276,12 +285,22 @@ class fo_libschema
       if (empty($table) || $inherits^array_key_exists($table,$this->schema['INHERITS']) ) {
         continue;
       }
+      $newTable = false;
       if (!DB_TableExists($table)) {
         $sql = "CREATE TABLE IF NOT EXISTS \"$table\" ()";
         $this->applyOrEchoOnce($sql, $stmt = __METHOD__ . $table);
+        $newTable = true;
+      } elseif (!array_key_exists($table, $this->currSchema['TABLE'])) {
+        $newTable = true;
       }
       foreach ($columns as $column => $modification) {
-        if ($this->currSchema['TABLE'][$table][$column]['ADD'] != $modification['ADD']) {
+        if (!$newTable && !array_key_exists($column, $this->currSchema['TABLE'][$table])) {
+          $colNewTable = true;
+        } else {
+          $colNewTable = $newTable;
+        }
+        if ($colNewTable ||
+            $this->currSchema['TABLE'][$table][$column]['ADD'] != $modification['ADD']) {
           $rename = "";
           if (DB_ColExists($table, $column)) {
             /* The column exists, but it looks different!
@@ -304,7 +323,8 @@ class fo_libschema
             $this->applyOrEchoOnce($sql = "ALTER TABLE \"$table\" DROP COLUMN \"$rename\"");
           }
         }
-        if ($this->currSchema['TABLE'][$table][$column]['ALTER'] != $modification['ALTER'] && isset($modification['ALTER'])) {
+        if ($colNewTable ||
+            $this->currSchema['TABLE'][$table][$column]['ALTER'] != $modification['ALTER'] && isset($modification['ALTER'])) {
           $sql = $modification['ALTER'];
           if ($this->debug) {
             print "$sql\n";
@@ -312,7 +332,8 @@ class fo_libschema
             $this->dbman->queryOnce($sql);
           }
         }
-        if ($this->currSchema['TABLE'][$table][$column]['DESC'] != $modification['DESC']) {
+        if ($colNewTable ||
+            $this->currSchema['TABLE'][$table][$column]['DESC'] != $modification['DESC']) {
           $sql = empty($modification['DESC']) ? "COMMENT ON COLUMN \"$table\".\"$column\" IS ''" : $modification['DESC'];
           $this->applyOrEchoOnce($sql, $stmt = __METHOD__ . "$table.$column.comment");
         }
@@ -328,11 +349,13 @@ class fo_libschema
     if (empty($this->schema['VIEW'])) {
       return;
     }
+    $newViews = !array_key_exists('VIEW', $this->currSchema);
     foreach ($this->schema['VIEW'] as $name => $sql) {
-      if (empty($name) || $this->currSchema['VIEW'][$name] == $sql) {
+      if (empty($name) || (!$newViews &&
+          $this->currSchema['VIEW'][$name] == $sql)) {
         continue;
       }
-      if (!empty($this->currSchema['VIEW'][$name])) {
+      if (!$newViews && !empty($this->currSchema['VIEW'][$name])) {
         $sqlDropView = "DROP VIEW IF EXISTS $name";
         $this->applyOrEchoOnce($sqlDropView);
       }
@@ -347,13 +370,15 @@ class fo_libschema
    */
   function dropConstraints()
   {
-    if (empty($this->currSchema['CONSTRAINT'])) {
+    if (!array_key_exists('CONSTRAINT', $this->currSchema) || // Empty DB
+        empty($this->currSchema['CONSTRAINT'])) {
       return;
     }
     foreach ($this->currSchema['CONSTRAINT'] as $name => $sql) {
       // skip if constraint name is empty or does not exist
-      if (empty($name) || ($this->schema['CONSTRAINT'][$name] == $sql)
-          || (DB_ConstraintExists($name) == false)) {
+      if (empty($name) || !array_key_exists($name, $this->schema['CONSTRAINT'])
+          || ($this->schema['CONSTRAINT'][$name] == $sql)
+          || !DB_ConstraintExists($name)) {
         continue;
       }
 
@@ -377,7 +402,8 @@ class fo_libschema
    */
   function dropIndexes()
   {
-    if (empty($this->currSchema['INDEX'])) {
+    if (!array_key_exists('INDEX', $this->currSchema) ||
+        empty($this->currSchema['INDEX'])) {
       return;
     }
     foreach ($this->currSchema['INDEX'] as $table => $IndexInfo) {
@@ -410,8 +436,15 @@ class fo_libschema
         echo "skipping orphan table: $table\n";
         continue;
       }
+      $newIndexes = false;
+      if (!array_key_exists('INDEX', $this->currSchema) ||
+          !array_key_exists($table, $this->currSchema['INDEX'])) {
+        $newIndexes = true;
+      }
       foreach ($indexInfo as $name => $sql) {
-        if (empty($name) || $this->currSchema['INDEX'][$table][$name] == $sql) {
+        if (empty($name) || (!$newIndexes &&
+            array_key_exists($name, $this->currSchema['INDEX'][$table]) &&
+            $this->currSchema['INDEX'][$table][$name] == $sql)) {
           continue;
         }
         $this->applyOrEchoOnce($sql);
@@ -433,7 +466,13 @@ class fo_libschema
     /* Constraints must be added in the correct order! */
     $orderedConstraints = array('primary' => array(), 'unique' => array(), 'foreign' => array(), 'other' => array());
     foreach ($this->schema['CONSTRAINT'] as $Name => $sql) {
-      if (empty($Name) || $this->currSchema['CONSTRAINT'][$Name] == $sql) {
+      $newConstraint = false;
+      if (!array_key_exists('CONSTRAINT', $this->currSchema) ||
+          !array_key_exists($Name, $this->currSchema['CONSTRAINT'])) {
+        $newConstraint = true;
+      }
+      if (empty($Name) || (!$newConstraint &&
+            $this->currSchema['CONSTRAINT'][$Name] == $sql)) {
         continue;
       }
       if (preg_match("/PRIMARY KEY/", $sql)) {
@@ -530,7 +569,7 @@ class fo_libschema
    */
   function addInheritedRelations()
   {
-    $sql = "SELECT class.relname AS table, daddy.relname AS inherits_from
+    $sql = "SELECT class.relname AS \"table\", daddy.relname AS inherits_from
       FROM pg_class AS class
       INNER JOIN pg_catalog.pg_inherits ON pg_inherits.inhrelid = class.oid
       INNER JOIN pg_class daddy ON pg_inherits.inhparent = daddy.oid";
@@ -551,22 +590,15 @@ class fo_libschema
   {
     $referencedSequencesInTableColumns = array();
 
-    $sql = "SELECT class.relname AS table,
-        attr.attnum AS ordinal,
-        attr.attname AS column_name,
-        type.typname AS type,
-        attr.atttypmod-4 AS modifier,
-        attr.attnotnull AS notnull,
-        attrdef.adsrc AS default,
-        col_description(attr.attrelid, attr.attnum) AS description
-      FROM pg_class AS class
-      INNER JOIN pg_attribute AS attr ON attr.attrelid = class.oid AND attr.attnum > 0
-      INNER JOIN pg_type AS type ON attr.atttypid = type.oid
-      INNER JOIN information_schema.tables AS tab ON class.relname = tab.table_name
-        AND tab.table_type = 'BASE TABLE'
-        AND tab.table_schema = 'public'
-      LEFT OUTER JOIN pg_attrdef AS attrdef ON adrelid = attrelid AND adnum = attnum
-      ORDER BY class.relname,attr.attnum";
+    $sql = "SELECT
+    table_name AS \"table\", ordinal_position AS ordinal, column_name,
+    udt_name AS type, character_maximum_length AS modifier,
+    CASE is_nullable WHEN 'YES' THEN false WHEN 'NO' THEN true END AS \"notnull\",
+    column_default AS \"default\",
+    col_description(table_name::regclass, ordinal_position) AS description
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+  ORDER BY table_name, ordinal_position;";
     $stmt = __METHOD__;
     $this->dbman->prepare($stmt, $sql);
     $result = $this->dbman->execute($stmt);
@@ -584,7 +616,11 @@ class fo_libschema
       if ($R['modifier'] > 0) {
         $Type .= '(' . $R['modifier'] . ')';
       }
-      $Desc = str_replace("'", "''", $R['description']);
+      if (!empty($R['description'])) {
+        $Desc = str_replace("'", "''", $R['description']);
+      } else {
+        $Desc = "";
+      }
       $this->currSchema['TABLEID'][$Table][$R['ordinal']] = $Column;
       if (!empty($Desc)) {
         $this->currSchema['TABLE'][$Table][$Column]['DESC'] = "COMMENT ON COLUMN \"$Table\".\"$Column\" IS '$Desc'";
@@ -730,11 +766,17 @@ class fo_libschema
         if (!empty($Key)) {
           $Key .= ",";
         }
-        $Key .= '"' . $this->currSchema['TABLEID'][$Results[$i]['table_name']][$K] . '"';
+        if (!empty($this->currSchema['TABLEID'][$Results[$i]['table_name']][$K])) {
+          $Key .= '"' . $this->currSchema['TABLEID'][$Results[$i]['table_name']][$K] . '"';
+        }
       }
       $Results[$i]['constraint_key'] = $Key;
       $Key = "";
-      $Keys = explode(" ", $Results[$i]['fk_constraint_key']);
+      if (!empty($Results[$i]['fk_constraint_key'])) {
+        $Keys = explode(" ", $Results[$i]['fk_constraint_key']);
+      } else {
+        $Keys = [];
+      }
       foreach ($Keys as $K) {
         if (empty($K)) {
           continue;
@@ -834,7 +876,7 @@ class fo_libschema
    */
   function addIndexes()
   {
-    $sql = "SELECT tablename AS table, indexname AS index, indexdef AS define
+    $sql = "SELECT tablename AS \"table\", indexname AS index, indexdef AS define
       FROM pg_indexes
       INNER JOIN information_schema.tables ON table_name = tablename
         AND table_type = 'BASE TABLE'
@@ -923,11 +965,12 @@ class fo_libschema
     /* set driver */
     $dbDriver = $this->dbman->getDriver();
     if (empty($dbDriver)) {
-      $this->dbman->setDriver(new Postgres($PG_CONN));
+      $pgDrive = new Postgres($PG_CONN);
+      $this->dbman->setDriver($pgDrive);
     }
 
     if (empty($filename)) {
-      $filename = stdout;
+      $filename = 'php://stdout';
     }
     $Schema = $this->getCurrSchema();
     $fout = fopen($filename, "w");
@@ -1043,7 +1086,7 @@ if (empty($dbManager) || !($dbManager instanceof DbManager)) {
   $logger = new Logger(__FILE__);
   $logger->pushHandler(new ErrorLogHandler(ErrorLogHandler::OPERATING_SYSTEM, $logLevel));
   $dbManager = new ModernDbManager($logger);
-  $pgDriver = new Postgres($PG_CONN);
+  $pgDriver = new Postgres($GLOBALS['PG_CONN']);
   $dbManager->setDriver($pgDriver);
 }
 /* simulate the old functions*/
@@ -1088,5 +1131,5 @@ function ExportSchema($filename = NULL)
 function MakeFunctions($Debug)
 {
   global $libschema;
-  return $libschema->makeFunctions($Debug);
+  $libschema->makeFunctions($Debug);
 }

@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2010-2013 Hewlett-Packard Development Company, L.P.
- * Copyright (C) 2014-2015 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2010-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\FolderDao;
@@ -24,6 +13,7 @@ use Fossology\Lib\Dao\UserDao;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\UI\FolderNav;
 use Fossology\Lib\UI\MenuHook;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 define("TITLE_UI_BROWSE", _("Browse"));
@@ -177,16 +167,26 @@ class ui_browse extends FO_Plugin
    */
   private function ShowFolder($folderId)
   {
-    $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    $rootFolder = $this->folderDao->getDefaultFolder(Auth::getUserId());
+    if ($rootFolder == NULL) {
+      $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    }
     /* @var $uiFolderNav FolderNav */
     $uiFolderNav = $GLOBALS['container']->get('ui.folder.nav');
 
-    $folderNav = '<div id="sidetree">';
+    $folderNav = '<div id="sidetree" class="container justify-content-center" style="min-width: 234px;">';
     if ($folderId != $rootFolder->getId()) {
-      $folderNav .= '<div class="treeheader" style="display:inline;"><a href="' .
-          Traceback_uri() . '?mod=' . $this->Name . '">Top</a> | </div>';
+      $folderNav .= '<div class="treeheader" style="display:inline;"><a class="btn btn-outline-success btn-sm" href="' .
+          Traceback_uri() . '?mod=' . $this->Name . '">Top folder</a> | </div>';
     }
-    $folderNav .= '<div id="sidetreecontrol" class="treeheader" style="display:inline;"><a href="?#">Collapse All</a> | <a href="?#">Expand All</a></div>';
+    $folderNav .= '<div id="sidetreecontrol" class="treeheader" style="display:inline;">
+                     <a class="btn btn-outline-success btn-sm" href="?#">Collapse All</a> |
+                     <a class="btn btn-outline-success btn-sm" href="?#">Expand All</a>
+                   </div><br/><br/>';
+    $folderNav .= '
+      <div class="col-sm-20" style="margin-top:-10px;">
+        <input id="searchFolderTree" type="text" class="form-control" name="searchFolderTree" placeholder="Search folder" autofocus="autofocus"">
+      </div>';
     $folderNav .= $uiFolderNav->showFolderTree($folderId).'</div>';
 
     $this->vars['folderNav'] = $folderNav;
@@ -195,7 +195,7 @@ class ui_browse extends FO_Plugin
     $this->vars['assigneeOptions'] = $assigneeArray;
     $this->vars['statusOptions'] = $this->uploadDao->getStatusTypeMap();
     $this->vars['folder'] = $folderId;
-    $this->vars['folderName'] = $rootFolder->getName();
+    $this->vars['folderName'] = $this->folderDao->getFolder($folderId)->getName();
   }
 
   /**
@@ -257,7 +257,10 @@ class ui_browse extends FO_Plugin
    */
   private function getFolderId($uploadId)
   {
-    $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    $rootFolder = $this->folderDao->getDefaultFolder(Auth::getUserId());
+    if ($rootFolder == NULL) {
+      $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    }
     if (empty($uploadId)) {
       return $rootFolder->getId();
     }
@@ -309,6 +312,12 @@ class ui_browse extends FO_Plugin
       }
 
       if (! Iscontainer($row['ufile_mode'])) {
+        $parentItemBounds = $this->uploadDao->getParentItemBounds($Upload);
+        if (! $parentItemBounds->containsFiles()) {
+          // Upload with a single file, open license view
+          return new RedirectResponse(Traceback_uri() . '?mod=view-license'
+            . Traceback_parm_keep(array("upload", "item")));
+        }
         global $Plugins;
         $View = &$Plugins[plugin_find_id("view")];
         if (! empty($View)) {

@@ -1,22 +1,11 @@
 #!/usr/bin/php
 <?php
-/***********************************************************
+/*
  get-projects.php
- Copyright (C) 2007 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2007 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  *
@@ -86,10 +75,8 @@ for ($i = 1; $i < $argc; $i++) {
     case '-h':
       echo $usage;
       exit(0);
-      break;
     default:
       die("ERROR: Unknown argument: $argv[$i]\n$usage");
-      break;
   }
 }
 
@@ -161,15 +148,12 @@ switch($last ) {
   case '.gz':
     echo $usage;
     exit(1);
-    break;
   case '.bz2':
     echo $usage;
     exit(1);
-    break;
   case '.zip':
     echo $usage;
     exit(1);
-    break;
 }
 
 echo "Processing Xml file $XML_input_file\n";
@@ -480,12 +464,11 @@ function wget_url($project_rank, $project_name, $ark_type, $proj_data, $mode){
       if (ereg('compressed data', $type)){
         $upload['Compressed'] =
       "'$project_rank' '$project_name' '$archive_path' '$short_desc' '$ver' '$ver_id' '$ver_date'";
-        $upload['Null'] = True;
       }
       else{
         $upload['Uncompressed'] = "'$project_name' '$archive_path'";
-        $upload['Null'] = True;
       }
+      $upload['Null'] = true;
     }
   }
   // close the file? (Suceeded and WGF), or is it faster to leave open?
@@ -547,8 +530,7 @@ function _getfmpath($path){
     return($path_wanted);
   }
   elseif (ereg('--no-check-certificate', $stat_line)){
-    echo
-	"ERROR Secure connect to sourceforge.net needed: in file $dir_entry\n";
+    echo "ERROR Secure connect to sourceforge.net needed: in file $dir_entry\n";
     echo "Line was:\n$stat_line\n";
     return($path_wanted);
   }
@@ -564,5 +546,3 @@ function _getfmpath($path){
 
   return($path_wanted);
 }
-
-?>

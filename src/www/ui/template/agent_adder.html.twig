@@ -1,12 +1,13 @@
-{# Copyright 2014-2015 Siemens AG
+{# SPDX-FileCopyrightText: © 2014-2015 Siemens AG
 
-   Copying and distribution of this file, with or without modification,
-   are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-   This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 {% extends "include/base.html.twig" %}
 
 {% block content %}
+<link rel="stylesheet" type="text/css" href="css/select2.min.css"/>
+<link rel="stylesheet" type="text/css" href="css/select2.custom.css"/>
+
   <form name="formy" method="post">
     {{ "Select an uploaded file for additional analysis."|trans }}
     <ol>
@@ -19,7 +20,7 @@
       <li>
         {{"Select the upload to analyze"|trans}}:<br/>
         <div id="uploaddiv">
-          <select size="10" name="upload" onChange="Agents_Get('{{ baseUri }}?mod=upload_agent_options&upload=' + this.value);">
+          <select size="10" name="upload" id="uploadToAnalyze" onChange="Agents_Get('{{ baseUri }}?mod=upload_agent_options&upload=' + this.value);">
             {% for foliup in folderListUploads %}
               <option value="{{ foliup.upload_pk }}" {% if uploadId==foliup.upload_pk %}selected="selected"{% endif %}>
                {{ foliup.name|e }} {% if foliup.upload_desc is not empty %}({{ foliup.upload_desc|e }}){% endif %}
@@ -28,6 +29,9 @@
           </select>
         </div>
       </li>
+      <li>
+         <input type="checkbox" name="scm" value="1"/> {{ 'Ignore files with particular Mimetype'| trans }}<img src="images/info_16.png" title="{{'Configure mimetypes from Admin-Customize-Skip MimeTypes from scanning'|trans}}" alt="" class="info-bullet"/><br/>
+     </li>
       <li> {{ "Select additional analysis."|trans }}<br/>
         <div id="agentsdiv">
           <select multiple size="10" id="agents" name="agents[]"></select>
@@ -42,8 +46,16 @@
 {% block foot %}
   {{ parent() }}
   <script type="text/javascript">
+    const select2f = {
+      select2Search: function() {
+        $('#uploadToAnalyze').select2({
+        "placeholder": "Select upload to analyze"
+        });
+      }
+    }
     $(document).ready(function () {
       $('img').tooltip();
+      select2f.select2Search();
     });
   </script>
   {% if uploadId %}
@@ -57,9 +69,10 @@
     {
       if ((Uploads.readyState==4) && (Uploads.status==200))
       {
-        document.getElementById('uploaddiv').innerHTML = '<select size="10" name="upload" onChange="Agents_Get(\'{{ baseUri }}?mod=upload_agent_options&upload=\' + this.value)">' + Uploads.responseText + '</select><p/>';
+        document.getElementById('uploaddiv').innerHTML = '<select size="10" name="upload" id="uploadToAnalyze" onChange="Agents_Get(\'{{ baseUri }}?mod=upload_agent_options&upload=\' + this.value)">' + Uploads.responseText + '</select><p/>';
         document.getElementById('agentsdiv').innerHTML = '';
       }
+      select2f.select2Search();
     }
   </script>
 

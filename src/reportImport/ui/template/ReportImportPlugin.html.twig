@@ -1,8 +1,6 @@
-{# Copyright 2015-2017 Siemens AG
+{# SPDX-FileCopyrightText: © 2015-2017 Siemens AG
 
-Copying and distribution of this file, with or without modification,
-are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 {% extends "include/base.html.twig" %}
 
@@ -36,9 +34,6 @@ This file is offered as-is, without any warranty.
                 <input type="radio" id="addNewLicensesAs-candidate" name="addNewLicensesAs" value="candidate" checked="checked">
                 <label for="addNewLicensesAs-candidate">license candidate</label>
                 <br/>
-                <span>
-                  Note: license candidates as scanner findings are currently not handled correctly in the UI
-                </span>
               </li>
               {% if userIsAdmin %}
               <li>
@@ -46,6 +41,20 @@ This file is offered as-is, without any warranty.
                 <label for="addNewLicensesAs-license">new license</label>
               </li>
               {% endif %}
+            </ul>
+          </li>
+          <li>
+            {{ 'Match license using'|trans }}
+            <ul>
+              <li>
+                <input type="radio" id="licenseMatch-shortname" name="licenseMatch" value="shortname">
+                <label for="licenseMatch-shortname">Shortname</label>
+                <br/>
+              </li>
+              <li>
+                <input type="radio" id="licenseMatch-spdxid" name="licenseMatch" value="spdxid" checked="checked">
+                <label for="licenseMatch-spdxid">SPDX ID</label>
+              </li>
             </ul>
           </li>
           <li>
@@ -86,8 +95,10 @@ This file is offered as-is, without any warranty.
             </ul>
           </li>
           <li>
-            <input type="checkbox" name="addCopyrights" value="true"/>
-            {{ 'Add the copyright information as textfindings'|trans }}
+            <label>
+              <input type="checkbox" name="addCopyrights" value="true"/>
+              {{ 'Add the copyright information as textfindings'|trans }}
+            </label>
           </li>
         </ul>
       </li>

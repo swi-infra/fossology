@@ -1,41 +1,35 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2011 Hewlett-Packard Development Company, L.P.
- * Copyright (C) 2014-2015 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2011 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\UI\Component;
 
 use Fossology\Lib\Auth\Auth;
-use Twig_Environment;
+use Twig\Environment;
 
 class Menu
 {
   const FULL_MENU_DEBUG = 'fullmenudebug';
+  /**
+   * @var string
+   * Name of cookie to handle banner close state.
+   */
+  const BANNER_COOKIE = 'close_banner';
   var $MenuTarget = "treenav";
   protected $renderer;
 
-  public function __construct(Twig_Environment $renderer)
+  public function __construct(Environment $renderer)
   {
     // Add default menus (with no actions linked to plugins)
     menu_insert("Main::Upload", 70);
     menu_insert("Main::Jobs", 60);
     menu_insert("Main::Organize", 50);
     menu_insert("Main::Help", -1);
-    menu_insert("Main::Help::Documentation", 0, NULL, NULL, NULL, "<a href='http://www.fossology.org/projects/fossology/wiki/User_Documentation'>Documentation</a>");
+    menu_insert("Main::Help::Documentation", 0, NULL, NULL, NULL, "<a href='https://github.com/fossology/fossology/wiki'>Documentation</a>");
     $this->renderer = $renderer;
   }
 
@@ -47,8 +41,7 @@ class Menu
     if (empty($menu)) {
       return;
     }
-    $output = "";
-    $output .= "<!--[if lt IE 7]><table><tr><td><![endif]-->\n";
+    $output = "<!--[if lt IE 7]><table><tr><td><![endif]-->\n";
     $output .= "<ul id='menu-$indent'>\n";
 
     foreach ($menu as $menuEntry) {
@@ -116,33 +109,31 @@ class Menu
    */
   function OutputCSS()
   {
-    $output = "";
 
-    $output .= "<style type=\"text/css\">\n";
+    $output = "<style type=\"text/css\">\n";
     /* Depth 0 is special: position is relative, colors are blue */
     $depth = 0;
     $label = "";
     $Menu = menu_find("Main", $MenuDepth);
-    $cssBorder = "border-color:#CCC #CCC #CCC #CCC; border-width:1px 1px 1px 1px;";
+    $cssBorder = "border-color:#bee5eb #bee5eb #bee5eb #bee5eb; border-width:1px 1px 1px 1px; border-radius:3px;";
     $cssPadding = "padding:4px 0px 4px 4px;";
     $FOSScolor1 = "#c50830";
-    $FOSScolor2 = "#808080";
     $FOSSbg = "white";
 
     $FOSSfg1 = "black";
     $FOSSbg1 = "white";
     $FOSSfg1h = $FOSScolor1; // highlight colors
-    $FOSSbg1h = "beige";
+    $FOSSbg1h = "#d1ecf1";
 
-    $FOSSfg2 = "black";
-    $FOSSbg2 = "beige";
+    $FOSSfg2 = "#0c5460";
+    $FOSSbg2 = "#d1ecf1";
     $FOSSfg2h = $FOSScolor1; // highlight colors
-    $FOSSbg2h = "beige";
+    $FOSSbg2h = "#d1ecf1";
 
-    $FOSSfg3 = "black";
-    $FOSSbg3 = "beige";
+    $FOSSfg3 = "#0c5460";
+    $FOSSbg3 = "#d1ecf1";
     $FOSSfg3h = $FOSScolor1; // highlight colors
-    $FOSSbg3h = "beige";
+    $FOSSbg3h = "#d1ecf1";
 
     if ($depth < $MenuDepth) {
       /** The "float:left" is needed to fix IE **/
@@ -196,7 +187,7 @@ class Menu
       $output .= "  { float:left; display:block; visibility:visible; }\n";
       $label .= " ul#menu-" . $depth . " li";
       $output .= $label . "\n";
-      $output .= "  { z-index:$depth; margin:0; padding:0; display:block; visibility:visible; position:relative; width:150px; }\n";
+      $output .= "  { z-index:$depth; margin:0; padding:0; display:block; visibility:visible; position:relative; width:150px; margin-left:-6px; }\n";
       $output .= $label . " a:link,\n";
       $output .= $label . " a:visited\n";
       $output .= "  { z-index:$depth; $cssPadding color:$FOSSfg3; background:$FOSSbg2h; border:1px solid #000; $cssBorder width:150px; display:block; }\n";
@@ -234,9 +225,18 @@ class Menu
     global $SysConf;
     $sysConfig = $SysConf['SYSCONFIG'];
 
+    $hide_banner = (array_key_exists(self::BANNER_COOKIE, $_COOKIE)
+                    && $_COOKIE[self::BANNER_COOKIE] == 1);
+
     $vars = array();
     $vars['title'] = empty($title) ? _("Welcome to FOSSology") : $title;
-    $vars['bannerMsg'] = @$sysConfig['BannerMsg'];
+    if ($hide_banner) {
+      $vars['bannerMsg'] = "";
+      $vars['systemLoad'] = "";
+    } else {
+      $vars['bannerMsg'] = @$sysConfig['BannerMsg'];
+      $vars['systemLoad'] = get_system_load_average().'<br/>';
+    }
     $vars['logoLink'] =  $sysConfig['LogoLink']?: 'http://fossology.org';
     $vars['logoImg'] =  $sysConfig['LogoImage']?: 'images/fossology-logo.gif';
 
@@ -269,8 +269,7 @@ class Menu
       $this->mergeUserLoginVars($vars);
     }
 
-    $out = $this->renderer->loadTemplate('components/menu.html.twig')->render($vars);
-    return $out;
+    return $this->renderer->load('components/menu.html.twig')->render($vars);
   }
 
   private function mergeUserLoginVars(&$vars)

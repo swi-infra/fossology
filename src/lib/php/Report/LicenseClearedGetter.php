@@ -1,32 +1,22 @@
 <?php
 /*
- Copyright (C) 2014-2018, Siemens AG
+ SPDX-FileCopyrightText: © 2014-2018 Siemens AG
  Author: Daniele Fognini
-
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\Report;
 
+use Fossology\Lib\Agent\Agent;
 use Fossology\Lib\BusinessRules\LicenseMap;
+use Fossology\Lib\Dao\AgentDao;
 use Fossology\Lib\Dao\ClearingDao;
 use Fossology\Lib\Dao\LicenseDao;
+use Fossology\Lib\Data\AgentRef;
 use Fossology\Lib\Data\ClearingDecision;
 use Fossology\Lib\Data\DecisionTypes;
-use Fossology\Lib\Proxy\ScanJobProxy;
 use Fossology\Lib\Data\License;
-use Fossology\Lib\Data\AgentRef;
+use Fossology\Lib\Proxy\ScanJobProxy;
 
 class LicenseClearedGetter extends ClearedGetterCommon
 {
@@ -42,7 +32,7 @@ class LicenseClearedGetter extends ClearedGetterCommon
   private $agentDao;
   /** @var string[] */
   private $licenseCache = array();
-  /** @var agentNames */
+  /** @var array $agentNames */
   protected $agentNames = AgentRef::AGENT_LIST;
 
   public function __construct()
@@ -73,11 +63,13 @@ class LicenseClearedGetter extends ClearedGetterCommon
           continue;
         }
 
-        if ($this->onlyComments && !($comment = $clearingLicense->getComment())) {
+        $comment = $clearingLicense->getComment();
+        if ($this->onlyComments && !($comment)) {
           continue;
         }
 
-        if ($this->onlyAcknowledgements && !($acknowledgement = $clearingLicense->getAcknowledgement())) {
+        $acknowledgement = $clearingLicense->getAcknowledgement();
+        if ($this->onlyAcknowledgements && !($acknowledgement)) {
           continue;
         }
 
@@ -94,19 +86,90 @@ class LicenseClearedGetter extends ClearedGetterCommon
           $reportInfo = $clearingLicense->getReportInfo();
           $text = $reportInfo ? : $this->getCachedLicenseText($licenseId, "any");
           $risk = $this->getCachedLicenseRisk($licenseId, $groupId);
+          $acknowledgement = $clearingLicense->getAcknowledgement();
         }
 
         $ungroupedStatements[] = array(
           'licenseId' => $licenseId,
           'risk' => $risk,
-          'content' => $licenseMap->getProjectedShortname($originLicenseId, $clearingLicense->getShortName()),
+          'content' => $licenseMap->getProjectedSpdxId(
+              $originLicenseId, $clearingLicense->getSpdxId()),
           'uploadtree_pk' => $clearingDecision->getUploadTreeId(),
-          'text' => $text
+          'text' => $text,
+          'acknowledgement' => $acknowledgement
         );
       }
     }
 
     return $ungroupedStatements;
+  }
+
+  /**
+   * Override of getCleared() to handle acknowledgement grouping
+   * {@inheritDoc}
+   * @see Fossology::Lib::Report::ClearedGetterCommon::getCleared()
+   */
+  public function getCleared($uploadId, $objectAgent, $groupId=null,
+    $extended=true, $agentCall=null, $isUnifiedReport=false)
+  {
+    $uploadTreeTableName = $this->uploadDao->getUploadtreeTableName($uploadId);
+    $ungroupedStatements = $this->getStatements($uploadId, $uploadTreeTableName,
+      $groupId);
+    $this->changeTreeIdsToPaths($ungroupedStatements, $uploadTreeTableName,
+      $uploadId);
+    if ($this->onlyAcknowledgements || $this->onlyComments) {
+      return $this->groupStatementsSpecial($ungroupedStatements, $objectAgent);
+    }
+    return $this->groupStatements($ungroupedStatements, $extended, $agentCall,
+      $isUnifiedReport, $objectAgent);
+  }
+
+  /**
+   * Group acknowledgement statements
+   * @param array $ungrupedStatements
+   * @param Agent $objectAgent
+   * @return array
+   */
+  protected function groupStatementsSpecial($ungrupedStatements, $objectAgent)
+  {
+    $statements = array();
+    $countLoop = 0;
+    foreach ($ungrupedStatements as $statement) {
+      $licenseId = $statement['licenseId'];
+      $content = convertToUTF8($statement['content'], false);
+      $content = htmlspecialchars($content, ENT_DISALLOWED);
+      $text = convertToUTF8($statement['text'], false);
+      $text = htmlspecialchars($text, ENT_DISALLOWED);
+      $fileName = $statement['fileName'];
+
+      $statementKey = md5("$content.$text");
+      if (!array_key_exists($statementKey, $statements)) {
+        $statements[$statementKey] = [
+          "licenseId" => $licenseId,
+          "content" => $content,
+          "text" => $text,
+          "files" => [$fileName]
+        ];
+      } else {
+        if (!in_array($fileName, $statements[$statementKey]["files"])) {
+          $statements[$statementKey]["files"][] = $fileName;
+        }
+      }
+
+      //To keep the scheduler alive for large files
+      $countLoop += 1;
+      if ($countLoop % 500 == 0) {
+        $objectAgent->heartbeat(0);
+      }
+    }
+    $statements = array_values($statements);
+    usort($statements, function($a, $b) {
+      return strnatcmp($a["content"], $b["content"]);
+    });
+    if (!empty($objectAgent)) {
+      $objectAgent->heartbeat(count($statements));
+    }
+    return array("statements" => array_values($statements));
   }
 
   /**
@@ -141,7 +204,7 @@ class LicenseClearedGetter extends ClearedGetterCommon
 
   /**
    * @param int $licenseId, $groupId
-   * @return Risk
+   * @return int|string
    */
   protected function getCachedLicenseRisk($licenseId, $groupId)
   {
@@ -153,7 +216,7 @@ class LicenseClearedGetter extends ClearedGetterCommon
 
   /**
    * @param int $uploadId, $groupId
-   * @return scannerLicenseHistogram, editedLicensesHist
+   * @return array scannerLicenseHistogram, editedLicensesHist
    */
   protected function getHistogram($uploadId, $groupId)
   {
@@ -177,10 +240,17 @@ class LicenseClearedGetter extends ClearedGetterCommon
         $count = $scannerLicenseHistogram[$licenseShortName]['unique'];
       }
       $editedCount = array_key_exists($licenseShortName, $editedLicensesHist) ? $editedLicensesHist[$licenseShortName]['count'] : 0;
-      if (strcmp($licenseShortName, LicenseDao::NO_LICENSE_FOUND) !== 0) {
-        $LicenseHistArray[] = array("scannerCount" => $count, "editedCount" => $editedCount, "licenseShortname" => $licenseShortName);
+
+      if (array_key_exists($licenseShortName, $scannerLicenseHistogram)) {
+        $licenseReportId = $scannerLicenseHistogram[$licenseShortName]['spdx_id'];
       } else {
-        $LicenseHistArray[] = array("scannerCount" => $noScannerLicenseFoundCount, "editedCount" => $editedNoLicenseFoundCount, "licenseShortname" => $licenseShortName);
+        $licenseReportId = $editedLicensesHist[$licenseShortName]['spdx_id'];
+      }
+
+      if (strcmp($licenseShortName, LicenseDao::NO_LICENSE_FOUND) !== 0) {
+        $LicenseHistArray[] = array("scannerCount" => $count, "editedCount" => $editedCount, "licenseShortname" => $licenseReportId);
+      } else {
+        $LicenseHistArray[] = array("scannerCount" => $noScannerLicenseFoundCount, "editedCount" => $editedNoLicenseFoundCount, "licenseShortname" => $licenseReportId);
       }
     }
     return $LicenseHistArray;
@@ -190,7 +260,7 @@ class LicenseClearedGetter extends ClearedGetterCommon
     * @brief callback to compare licenses
     * @param array $licenses1
     * @param array $licenses2
-    * @return interger difference of license ids
+    * @return int difference of license ids
     */
   function checkLicenseId($licenses1, $licenses2)
   {
@@ -206,10 +276,10 @@ class LicenseClearedGetter extends ClearedGetterCommon
   function updateIdentifiedGlobalLicenses($licensesMain, $licenses)
   {
     $onlyMainLic = array_udiff($licensesMain, $licenses, array($this, "checkLicenseId"));
-    $mainLicensesInIdetifiedFiles = array_uintersect($licenses, $licensesMain, array($this, "checkLicenseId"));
+    $mainLicensesInIdentifiedFiles = array_uintersect($licenses, $licensesMain, array($this, "checkLicenseId"));
     $onlyLicense = array_udiff($licenses, $licensesMain, array($this, "checkLicenseId"));
     return array(
-      array_values(array_merge($onlyMainLic, $mainLicensesInIdetifiedFiles)),
+      array_values(array_merge($onlyMainLic, $mainLicensesInIdentifiedFiles)),
       array_values($onlyLicense)
     );
   }

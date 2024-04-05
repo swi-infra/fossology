@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2015 Hewlett-Packard Development Company, L.P.
- *               2014-2017,2020, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2017, 2020 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Ajax;
 
@@ -33,6 +22,7 @@ use Fossology\Lib\Data\Tree\ItemTreeBounds;
 use Fossology\Lib\Plugin\DefaultPlugin;
 use Fossology\Lib\Proxy\ScanJobProxy;
 use Fossology\Lib\Proxy\UploadTreeProxy;
+use Fossology\Lib\Data\DecisionTypes;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -72,6 +62,9 @@ class AjaxExplorer extends DefaultPlugin
   private $noLicenseUploadTreeView;
   /** @var array */
   protected $agentNames = AgentRef::AGENT_LIST;
+  /** @var array $cacheClearedCounter
+   * Array to hold item tree which are already calculated */
+  private $cacheClearedCounter;
 
   public function __construct()
   {
@@ -91,6 +84,7 @@ class AjaxExplorer extends DefaultPlugin
     $this->filesToBeCleared = [];
     $this->alreadyClearedUploadTreeView = NULL;
     $this->noLicenseUploadTreeView = NULL;
+    $this->cacheClearedCounter = [];
   }
 
   public function __destruct()
@@ -108,7 +102,7 @@ class AjaxExplorer extends DefaultPlugin
    * @param Request $request
    * @return Response
    */
-  protected function handle(Request $request)
+  public function handle(Request $request)
   {
     $upload = intval($request->get("upload"));
     $groupId = Auth::getGroupId();
@@ -132,7 +126,7 @@ class AjaxExplorer extends DefaultPlugin
 
     $UniqueTagArray = array();
     $this->licenseProjector = new LicenseMap($this->getObject('db.manager'),$groupId,LicenseMap::CONCLUSION,true);
-    $vars = $this->createFileListing($tag_pk, $itemTreeBounds, $UniqueTagArray, $selectedAgentId, $groupId, $scanJobProxy);
+    $vars = $this->createFileListing($tag_pk, $itemTreeBounds, $UniqueTagArray, $selectedAgentId, $groupId, $scanJobProxy, $request);
 
     return new JsonResponse(array(
             'sEcho' => intval($request->get('sEcho')),
@@ -150,9 +144,10 @@ class AjaxExplorer extends DefaultPlugin
    * @param $selectedAgentId
    * @param int $groupId
    * @param ScanJobProxy $scanJobProxy
+   * @param Request $request
    * @return array
    */
-  private function createFileListing($tagId, ItemTreeBounds $itemTreeBounds, &$UniqueTagArray, $selectedAgentId, $groupId, $scanJobProxy)
+  private function createFileListing($tagId, ItemTreeBounds $itemTreeBounds, &$UniqueTagArray, $selectedAgentId, $groupId, $scanJobProxy, $request)
   {
     if (!empty($selectedAgentId)) {
       $agentName = $this->agentDao->getAgentName($selectedAgentId);
@@ -163,7 +158,7 @@ class AjaxExplorer extends DefaultPlugin
 
     /** change the license result when selecting one version of nomos */
     $uploadId = $itemTreeBounds->getUploadId();
-    $isFlat = isset($_GET['flatten']);
+    $isFlat = $request->get('flatten') !== null;
 
     if ($isFlat) {
       $options = array(UploadTreeProxy::OPT_RANGE => $itemTreeBounds);
@@ -172,7 +167,7 @@ class AjaxExplorer extends DefaultPlugin
     }
 
     $searchMap = array();
-    foreach (explode(' ',GetParm('sSearch', PARM_RAW)) as $pair) {
+    foreach (explode(' ',$request->get('sSearch')) as $pair) {
       $a = explode(':',$pair);
       if (count($a) == 1) {
         $searchMap['head'] = $pair;
@@ -187,15 +182,15 @@ class AjaxExplorer extends DefaultPlugin
     if (array_key_exists('head', $searchMap) && strlen($searchMap['head'])>=1) {
       $options[UploadTreeProxy::OPT_HEAD] = $searchMap['head'];
     }
-    if (($rfId=GetParm('scanFilter',PARM_INTEGER))>0) {
+    if (($rfId=$request->get('scanFilter'))>0) {
       $options[UploadTreeProxy::OPT_AGENT_SET] = $selectedScanners;
       $options[UploadTreeProxy::OPT_SCAN_REF] = $rfId;
     }
-    if (($rfId=GetParm('conFilter',PARM_INTEGER))>0) {
+    if (($rfId=$request->get('conFilter'))>0) {
       $options[UploadTreeProxy::OPT_GROUP_ID] = Auth::getGroupId();
       $options[UploadTreeProxy::OPT_CONCLUDE_REF] = $rfId;
     }
-    $openFilter = GetParm('openCBoxFilter',PARM_RAW);
+    $openFilter = $request->get('openCBoxFilter');
     if ($openFilter=='true' || $openFilter=='checked') {
       $options[UploadTreeProxy::OPT_AGENT_SET] = $selectedScanners;
       $options[UploadTreeProxy::OPT_GROUP_ID] = Auth::getGroupId();
@@ -208,10 +203,11 @@ class AjaxExplorer extends DefaultPlugin
 
     $columnNamesInDatabase = array($isFlat?'ufile_name':'lft');
     $defaultOrder = array(array(0, "asc"));
-    $orderString = $this->getObject('utils.data_tables_utility')->getSortingString($_GET, $columnNamesInDatabase, $defaultOrder);
 
-    $offset = GetParm('iDisplayStart', PARM_INTEGER);
-    $limit = GetParm('iDisplayLength', PARM_INTEGER);
+    $orderString = $this->getObject('utils.data_tables_utility')->getSortingString($request->get('fromRest') ? $request->request->all(): $request->query->all(), $columnNamesInDatabase, $defaultOrder);
+
+    $offset = $request->get('iDisplayStart');
+    $limit = $request->get('iDisplayLength');
     if ($offset) {
       $orderString .= " OFFSET $offset";
     }
@@ -261,7 +257,7 @@ class AjaxExplorer extends DefaultPlugin
       if (empty($child)) {
         continue;
       }
-      $tableData[] = $this->createFileDataRow($child, $uploadId, $selectedAgentId, $pfileLicenses, $groupId, $editedMappedLicenses, $baseUri, $ModLicView, $UniqueTagArray, $isFlat, $latestSuccessfulAgentIds);
+      $tableData[] = $this->createFileDataRow($child, $uploadId, $selectedAgentId, $pfileLicenses, $groupId, $editedMappedLicenses, $baseUri, $ModLicView, $UniqueTagArray, $isFlat, $latestSuccessfulAgentIds, $request);
     }
 
     $vars['fileData'] = $tableData;
@@ -281,18 +277,26 @@ class AjaxExplorer extends DefaultPlugin
    * @param array $UniqueTagArray
    * @param boolean $isFlat
    * @param int[] $latestSuccessfulAgentIds
+   * @param Request $request
    * @return array
    */
-  private function createFileDataRow($child, $uploadId, $selectedAgentId, $pfileLicenses, $groupId, $editedMappedLicenses, $uri, $ModLicView, &$UniqueTagArray, $isFlat, $latestSuccessfulAgentIds)
+  private function createFileDataRow($child, $uploadId, $selectedAgentId, $pfileLicenses, $groupId, $editedMappedLicenses, $uri, $ModLicView, &$UniqueTagArray, $isFlat, $latestSuccessfulAgentIds, $request)
   {
+    $fileDetails = array(
+      "fileName" => "", "id" => "", "uploadId" => $uploadId, "agentId" => "", "isContainer" => false,
+    );
+
     $fileId = $child['pfile_fk'];
     $childUploadTreeId = $child['uploadtree_pk'];
     $linkUri = '';
     if (!empty($fileId) && !empty($ModLicView)) {
       $linkUri = Traceback_uri();
       $linkUri .= "?mod=view-license&upload=$uploadId&item=$childUploadTreeId";
+      $fileDetails["id"] = intval($childUploadTreeId);
+      $fileDetails["uploadId"] = $uploadId;
       if ($selectedAgentId) {
         $linkUri .= "&agentId=$selectedAgentId";
+        $fileDetails["agentId"] = $selectedAgentId;
       }
     }
 
@@ -312,8 +316,10 @@ class AjaxExplorer extends DefaultPlugin
           $groupId, $editedMappedLicenses, $parentItemTreeBound));
 
       $linkUri = "$uri&item=" . $uploadtree_pk;
+      $fileDetails["id"] = intval($uploadtree_pk);
       if ($selectedAgentId) {
         $linkUri .= "&agentId=$selectedAgentId";
+        $fileDetails["agentId"] = $selectedAgentId;
       }
       $child['ufile_name'] = $fatChild['ufile_name'];
       if (!Iscontainer($fatChild['ufile_mode'])) {
@@ -322,8 +328,11 @@ class AjaxExplorer extends DefaultPlugin
     } else if ($isContainer) {
       $uploadtree_pk = Isartifact($child['ufile_mode']) ? DirGetNonArtifact($childUploadTreeId, $this->uploadtree_tablename) : $childUploadTreeId;
       $linkUri = "$uri&item=" . $uploadtree_pk;
+      $fileDetails["id"] = intval($uploadtree_pk);
+      $fileDetails["isContainer"] = true;
       if ($selectedAgentId) {
         $linkUri .= "&agentId=$selectedAgentId";
+        $fileDetails["agentId"] = $selectedAgentId;
       }
     }
 
@@ -331,22 +340,38 @@ class AjaxExplorer extends DefaultPlugin
     /* id of each element is its uploadtree_pk */
     $fileName = $child['ufile_name'];
     if ($isContainer) {
+      $fileDetails["fileName"] = $fileName;
       $fileName = "<a href='$linkUri'><span style='color: darkblue'> <b>$fileName</b> </span></a>";
     } else if (!empty($linkUri)) {
+      $fileDetails["fileName"] = $fileName;
       $fileName = "<a href='$linkUri'>$fileName</a>";
     }
     /* show licenses under file name */
     $childItemTreeBounds =
         new ItemTreeBounds($childUploadTreeId, $this->uploadtree_tablename, $child['upload_fk'], $child['lft'], $child['rgt']);
+    $totalFilesCount = $this->uploadDao->countPlainFiles($childItemTreeBounds);
+    $licenseEntriesRest = array();
     if ($isContainer) {
+      $fileDetails["isContainer"] = true;
       $agentFilter = $selectedAgentId ? array($selectedAgentId) : $latestSuccessfulAgentIds;
       $licenseEntries = $this->licenseDao->getLicenseShortnamesContained($childItemTreeBounds, $agentFilter, array());
       $editedLicenses = $this->clearingDao->getClearedLicenses($childItemTreeBounds, $groupId);
+
+      if ($request->get('fromRest')) {
+        foreach ($licenseEntries as $shortName) {
+          $licenseEntriesRest[] = array(
+            "id" => $this->licenseDao->getLicenseByShortName($shortName, $groupId)->getId(),
+            "name" => $shortName,
+            "agents" => []
+          );
+        }
+      }
     } else {
       $licenseEntries = array();
       if (array_key_exists($fileId, $pfileLicenses)) {
         foreach ($pfileLicenses[$fileId] as $shortName => $rfInfo) {
           $agentEntries = array();
+          $agentEntriesRest = array();
           foreach ($rfInfo as $agent => $match) {
             $agentName = $this->agentNames[$agent];
             $agentEntry = "<a href='?mod=view-license&upload=$child[upload_fk]&item=$childUploadTreeId&format=text&agentId=$match[agent_id]&licenseId=$match[license_id]#highlight'>" . $agentName . "</a>";
@@ -355,7 +380,17 @@ class AjaxExplorer extends DefaultPlugin
               $agentEntry .= ": $match[match_percentage]%";
             }
             $agentEntries[] = $agentEntry;
+            $agentEntriesRest[] = array(
+              "name" => $agentName,
+              "id" => intval($match['agent_id']),
+              "matchPercentage" => intval($match['match_percentage']),
+            );
           }
+          $licenseEntriesRest[] = array(
+            "id" => $this->licenseDao->getLicenseByShortName($shortName, $groupId)->getId(),
+            "name" => $shortName,
+            "agents" => $agentEntriesRest,
+          );
           $licenseEntries[] = $shortName . " [" . implode("][", $agentEntries) . "]";
         }
       }
@@ -367,13 +402,14 @@ class AjaxExplorer extends DefaultPlugin
         $editedLicenses = array();
       }
     }
-
+    $concludedLicensesRest = array();
     $concludedLicenses = array();
     /** @var LicenseRef $licenseRef */
     foreach ($editedLicenses as $licenseRef) {
       $projectedId = $this->licenseProjector->getProjectedId($licenseRef->getId());
       $projectedName = $this->licenseProjector->getProjectedShortname($licenseRef->getId(),$licenseRef->getShortName());
       $concludedLicenses[$projectedId] = $projectedName;
+      $concludedLicensesRest[] = array('id' => $projectedId, 'name' => $projectedName);
     }
 
     $editedLicenseList = implode(', ', $concludedLicenses);
@@ -386,9 +422,9 @@ class AjaxExplorer extends DefaultPlugin
 
     if ($isContainer) {
       $getTextEditBulk = _("Bulk");
-      $fileListLinks .= "[<a href='#' onclick='openBulkModal($childUploadTreeId)' >$getTextEditBulk</a>]";
+      $fileListLinks .= "[<a href='#' data-toggle='modal' data-target='#bulkModal' onclick='openBulkModal($childUploadTreeId)' >$getTextEditBulk</a>]";
     }
-    $fileListLinks .= "<input type='checkbox' id='selectedForIrrelevant' value='".$childUploadTreeId."'>";
+    $fileListLinks .= "<input type='checkbox' class='selectedForIrrelevant' class='info-bullet view-license-rc-size' value='".$childUploadTreeId."'>";
     $filesThatShouldStillBeCleared = array_key_exists($childItemTreeBounds->getItemId()
         , $this->filesThatShouldStillBeCleared) ? $this->filesThatShouldStillBeCleared[$childItemTreeBounds->getItemId()] : 0;
 
@@ -399,14 +435,6 @@ class AjaxExplorer extends DefaultPlugin
 
     $img = ($filesCleared == $filesToBeCleared) ? 'green' : 'red';
 
-    // override green/red flag with yellow flag in case of single file with decision type "To Be Discussed"
-    $isDecisionTBD = $this->clearingDao->isDecisionTBD($childUploadTreeId, $groupId);
-    $img = $isDecisionTBD ? 'yellow' : $img;
-
-    // override green/red flag with greenRed flag in case of single file with decision type "Do Not Use"
-    $isDecisionDNU = $this->clearingDao->isDecisionDNU($childUploadTreeId, $groupId);
-    $img = $isDecisionDNU ? 'redGreen' : $img;
-
     // override green/red flag with grey flag in case of no_license_found scanner finding
     if (!empty($licenseList) && empty($editedLicenseList)) {
       $img = (
@@ -416,7 +444,27 @@ class AjaxExplorer extends DefaultPlugin
              ) ? 'grey' : $img;
     }
 
-    return array($fileName, $licenseList, $editedLicenseList, $img, "$filesCleared/$filesToBeCleared", $fileListLinks);
+    // override green/red flag with yellow flag in case of single file with decision type "To Be Discussed"
+    $isDecisionTBD = $this->clearingDao->isDecisionCheck($childUploadTreeId, $groupId, DecisionTypes::TO_BE_DISCUSSED);
+    $img = $isDecisionTBD ? 'yellow' : $img;
+
+    // override green/red flag with greenRed flag in case of single file with decision type "Do Not Use" or "Non functional"
+    $isDecisionDNU = $this->clearingDao->isDecisionCheck($childUploadTreeId, $groupId, DecisionTypes::DO_NOT_USE);
+    $isDecisionNonFunctional = $this->clearingDao->isDecisionCheck($childUploadTreeId, $groupId, DecisionTypes::NON_FUNCTIONAL);
+
+    $img = ($isDecisionDNU || $isDecisionNonFunctional) ? 'redGreen' : $img;
+
+    return $request->get('fromRest') ? array(
+      "fileDetails" => $fileDetails,
+      "licenseList" => $licenseEntriesRest,
+      "editedLicenseList" => $concludedLicensesRest,
+      "clearingStatus" => $img,
+      "clearingProgress" => array(
+        "filesCleared" => intval($filesCleared),
+        "filesToBeCleared" => intval($filesToBeCleared),
+        "totalFilesCount" => intval($totalFilesCount)
+      ),
+    ) : array($fileName, $licenseList, $editedLicenseList, $img, "$filesCleared / $filesToBeCleared / $totalFilesCount", $fileListLinks);
   }
 
   /**
@@ -464,18 +512,6 @@ class AjaxExplorer extends DefaultPlugin
       $this->alreadyClearedUploadTreeView->materialize();
     }
 
-    if (! $isFlat) {
-      $this->filesThatShouldStillBeCleared = array_replace(
-        $this->filesThatShouldStillBeCleared,
-        $this->alreadyClearedUploadTreeView->countMaskedNonArtifactChildren(
-          $itemTreeBounds->getItemId()));
-    } else {
-      $this->filesThatShouldStillBeCleared = array_replace(
-        $this->filesThatShouldStillBeCleared,
-        $this->alreadyClearedUploadTreeView->getNonArtifactDescendants(
-          $itemTreeBounds));
-    }
-
     if ($this->noLicenseUploadTreeView === NULL) {
       // Initialize the proxy view only once for the complete table
       $this->noLicenseUploadTreeView = new UploadTreeProxy(
@@ -489,20 +525,45 @@ class AjaxExplorer extends DefaultPlugin
         $viewName = 'no_license_uploadtree' . $itemTreeBounds->getUploadId());
       $this->noLicenseUploadTreeView->materialize();
     }
-    if (! $isFlat) {
-      $this->filesToBeCleared = array_replace($this->filesToBeCleared,
-        $this->noLicenseUploadTreeView->countMaskedNonArtifactChildren(
-          $itemTreeBounds->getItemId()));
-    } else {
-      $this->filesToBeCleared = array_replace($this->filesToBeCleared,
-        $this->noLicenseUploadTreeView->getNonArtifactDescendants($itemTreeBounds));
-    }
 
+    $this->updateFilesToBeCleared($isFlat, $itemTreeBounds);
     $allDecisions = $this->clearingDao->getFileClearingsFolder($itemTreeBounds,
       $groupId, $isFlat);
     $editedMappedLicenses = array_replace($editedMappedLicenses,
       $this->clearingFilter->filterCurrentClearingDecisions($allDecisions));
     return $pfileLicenses;
+  }
+
+  /**
+   * Update filesThatShouldStillBeCleared and filesToBeCleared counts if the
+   * passed item has not been cached yet.
+   * @param boolean $isFlat
+   * @param ItemTreeBounds $itemTreeBounds
+   */
+  private function updateFilesToBeCleared($isFlat, $itemTreeBounds)
+  {
+    $itemId = $itemTreeBounds->getItemId();
+    if (in_array($itemId, $this->cacheClearedCounter)) {
+      // Already calculated, no need to recount
+      return;
+    }
+    $this->cacheClearedCounter[] = $itemId;
+    if (! $isFlat) {
+      $this->filesThatShouldStillBeCleared = array_replace(
+        $this->filesThatShouldStillBeCleared,
+        $this->alreadyClearedUploadTreeView->countMaskedNonArtifactChildren(
+          $itemId));
+      $this->filesToBeCleared = array_replace($this->filesToBeCleared,
+        $this->noLicenseUploadTreeView->countMaskedNonArtifactChildren(
+          $itemId));
+    } else {
+      $this->filesThatShouldStillBeCleared = array_replace(
+        $this->filesThatShouldStillBeCleared,
+        $this->alreadyClearedUploadTreeView->getNonArtifactDescendants(
+          $itemTreeBounds));
+      $this->filesToBeCleared = array_replace($this->filesToBeCleared,
+        $this->noLicenseUploadTreeView->getNonArtifactDescendants($itemTreeBounds));
+    }
   }
 }
 

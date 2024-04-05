@@ -1,21 +1,10 @@
 <?php
 /*
  Author: Daniele Fognini
- Copyright (C) 2014, Siemens AG
+ SPDX-FileCopyrightText: © 2014 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file DeciderJobAgent.php
  * @brief Decider agent
@@ -169,8 +158,16 @@ class DeciderJobAgent extends Agent
 
     $this->licenseMap = new LicenseMap($this->dbManager, $this->groupId, $this->licenseMapUsage);
 
-    $this->processClearingEventOfCurrentJob();
-
+    if ($this->conflictStrategyId == 'global') {
+      $uploadTreeId = 0; // zero because we are checking candidate license for whole upload.
+      if (!empty($this->clearingDao->getCandidateLicenseCountForCurrentDecisions($uploadTreeId, $uploadId))) {
+        throw new \Exception( _("Cannot add candidate license as global decision\n") );
+      }
+      $this->heartbeat(1);
+      $this->heartbeat($this->clearingDao->marklocalDecisionsAsGlobal($uploadId));
+    } else {
+      $this->processClearingEventOfCurrentJob();
+    }
     return true;
   }
 

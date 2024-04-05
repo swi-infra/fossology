@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2015 Hewlett-Packard Development Company, L.P.
- *               2014-2015 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Page;
 
@@ -25,7 +14,9 @@ use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\Dao\AgentDao;
 use Fossology\Lib\Dao\ClearingDao;
 use Fossology\Lib\Dao\LicenseDao;
+use Fossology\Lib\Dao\TreeDao;
 use Fossology\Lib\Dao\UploadDao;
+use Fossology\Lib\Data\AgentRef;
 use Fossology\Lib\Data\ClearingDecision;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
 use Fossology\Lib\Plugin\DefaultPlugin;
@@ -33,7 +24,6 @@ use Fossology\Lib\Proxy\ScanJobProxy;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Fossology\Lib\Data\AgentRef;
 
 /**
  * \file ui-browse-license.php
@@ -90,9 +80,22 @@ class BrowseLicense extends DefaultPlugin
     if (empty($Item) || empty($Upload)) {
       return;
     }
-    $viewLicenseURI = "view-license" . Traceback_parm_keep(array("show", "format", "page", "upload", "item"));
+    $viewLicenseURI = $this->NAME . Traceback_parm_keep(array("show", "format", "page", "upload", "item"));
     $menuName = $this->Title;
-    if (GetParm("mod", PARM_STRING) == self::NAME) {
+
+    $uploadTreeTable = $this->uploadDao->getUploadtreeTableName($Upload);
+    $itemBounds = $this->uploadDao->getItemTreeBounds($Item, $uploadTreeTable);
+    if (! $itemBounds->containsFiles()) {
+      global $container;
+      /**
+       * @var TreeDao $treeDao Tree dao object
+       */
+      $treeDao = $container->get('dao.tree');
+      $parent = $treeDao->getParentOfItem($itemBounds);
+      $viewLicenseURI = $this->NAME . Traceback_parm_keep(array("show",
+        "format", "page", "upload")) . "&item=$parent";
+    }
+    if (GetParm("mod", PARM_STRING) == $this->NAME) {
       menu_insert("Browse::$menuName", 99);
       menu_insert("View::$menuName", 99);
       menu_insert("View-Meta::$menuName", 99);
@@ -117,10 +120,15 @@ class BrowseLicense extends DefaultPlugin
     }
 
     $item = intval($request->get("item"));
+    $this->uploadtree_tablename = $this->uploadDao->getUploadtreeTableName($upload);
+    $itemTreeBounds = $this->uploadDao->getItemTreeBounds($item, $this->uploadtree_tablename);
+    $left = $itemTreeBounds->getLeft();
+    if (empty($left)) {
+      return $this->flushContent(_("Job unpack/adj2nest hasn't completed."));
+    }
 
     $vars['baseuri'] = Traceback_uri();
     $vars['uploadId'] = $upload;
-    $this->uploadtree_tablename = $this->uploadDao->getUploadtreeTableName($upload);
     if ($request->get('show')=='quick') {
       $item = $this->uploadDao->getFatItemId($item,$upload,$this->uploadtree_tablename);
     }
@@ -130,11 +138,6 @@ class BrowseLicense extends DefaultPlugin
       -1, '', '', $this->uploadtree_tablename);
     $vars['licenseArray'] = $this->licenseDao->getLicenseArray();
 
-    $itemTreeBounds = $this->uploadDao->getItemTreeBounds($item, $this->uploadtree_tablename);
-    $left = $itemTreeBounds->getLeft();
-    if (empty($left)) {
-      return $this->flushContent(_("Job unpack/adj2nest hasn't completed."));
-    }
     $histVars = $this->showUploadHist($itemTreeBounds);
     if (is_a($histVars, 'Symfony\\Component\\HttpFoundation\\RedirectResponse')) {
       return $histVars;
@@ -222,7 +225,7 @@ class BrowseLicense extends DefaultPlugin
    * @param ClearingDecision []
    * @return array
    */
-  private function createLicenseHistogram($uploadTreeId, $tagId, ItemTreeBounds $itemTreeBounds, $agentIds, $groupId)
+  public function createLicenseHistogram($uploadTreeId, $tagId, ItemTreeBounds $itemTreeBounds, $agentIds, $groupId)
   {
     $fileCount = $this->uploadDao->countPlainFiles($itemTreeBounds);
     $licenseHistogram = $this->licenseDao->getLicenseHistogram($itemTreeBounds, $agentIds);
@@ -249,7 +252,7 @@ class BrowseLicense extends DefaultPlugin
     $editedNoLicenseFoundCount = array_key_exists(LicenseDao::NO_LICENSE_FOUND, $editedLicensesHist)
             ? $editedLicensesHist[LicenseDao::NO_LICENSE_FOUND]['count'] : 0;
 
-    $vars = array('tableDataJson'=>json_encode($tableData),
+    return array('tableDataJson'=>json_encode($tableData),
         'uniqueLicenseCount'=>$uniqueLicenseCount,
         'fileCount'=>$fileCount,
         'scannerUniqueLicenseCount'=>$scannerUniqueLicenseCount,
@@ -261,8 +264,6 @@ class BrowseLicense extends DefaultPlugin
         'scannerLicenses'=>$licenseHistogram,
         'editedLicenses'=>$editedLicensesHist
         );
-
-    return $vars;
   }
 
   /**
@@ -314,7 +315,7 @@ class BrowseLicense extends DefaultPlugin
    */
   public function renderString($templateName, $vars)
   {
-    return $this->renderer->loadTemplate($templateName)->render($vars);
+    return $this->renderer->load($templateName)->render($vars);
   }
 
   /**

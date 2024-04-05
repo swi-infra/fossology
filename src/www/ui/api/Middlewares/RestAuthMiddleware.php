@@ -1,21 +1,10 @@
 <?php
-/***************************************************************
- Copyright (C) 2018-2019 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2018-2019 Siemens AG
  Author: Gaurav Mishra <mishra.gaurav@siemens.com>
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @dir
  * @brief Middlewares for the Slim framework
@@ -25,11 +14,13 @@
 
 namespace Fossology\UI\Api\Middlewares;
 
-use Fossology\UI\Api\Models\Info;
-use Fossology\UI\Api\Models\InfoType;
+use Fossology\UI\Api\Exceptions\HttpBadRequestException;
+use Fossology\UI\Api\Exceptions\HttpForbiddenException;
 use Fossology\UI\Api\Helper\AuthHelper;
-use Psr\Http\Message\ServerRequestInterface;
+use Fossology\UI\Api\Helper\CorsHelper;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 
 /**
  * @class RestAuthMiddleware
@@ -40,58 +31,64 @@ class RestAuthMiddleware
   /**
    * Check authentication for all calls, except for /auth, /tokens
    *
-   * @param  ServerRequestInterface $request  PSR7 request
-   * @param  ResponseInterface      $response PSR7 response
-   * @param  callable               $next     Next middleware
+   * @param Request $request PSR7 request
+   * @param RequestHandler $handler PSR-15 request handler
    *
    * @return ResponseInterface
+   * @throws HttpForbiddenException If the token does not have required scope
+   * @throws HttpBadRequestException If the token is not valid
    */
-  public function __invoke($request, $response, $next)
+  public function __invoke(Request $request, RequestHandler $handler) : ResponseInterface
   {
     $requestUri = $request->getUri();
-    if (stristr($requestUri->getPath(), "/auth") !== false) {
-      $response = $next($request, $response);
-    } elseif (stristr($requestUri->getPath(), "/version") !== false) {
-      $response = $next($request, $response);
+    $requestPath = strtolower($requestUri->getPath());
+    $authFreePaths = ["/version", "/info", "/openapi", "/health"];
+
+    $isPassThroughPath = false;
+    foreach ($authFreePaths as $authFreePath) {
+      if (strpos($requestPath, $authFreePath) !== false) {
+        $isPassThroughPath = true;
+        break;
+      }
+    }
+
+    if (stristr($request->getMethod(), "options") !== false) {
+      $response = $handler->handle($request);
+    } elseif ($isPassThroughPath) {
+      $response = $handler->handle($request);
     } elseif (stristr($requestUri->getPath(), "/tokens") !== false &&
-      stristr($request->getMethod(), "post") !== false) {
-      $response = $next($request, $response);
+        stristr($requestUri->getPath(), "/users/tokens") === false &&
+        stristr($request->getMethod(), "post") !== false) {
+      $response = $handler->handle($request);
     } else {
+      /** @var AuthHelper $authHelper */
       $authHelper = $GLOBALS['container']->get('helper.authHelper');
-      $jwtToken = $request->getHeader('Authorization')[0];
+      $authHeaders = $request->getHeader('Authorization');
+      if (!empty($authHeaders)) {
+        $jwtToken = $authHeaders[0];
+      } else {
+        $jwtToken = "";
+      }
       $userId = -1;
       $tokenScope = false;
-      $tokenValid = $authHelper->verifyAuthToken($jwtToken, $userId,
-        $tokenScope);
-      if ($tokenValid === true && (stristr($request->getMethod(), "get") === false &&
-          stristr($tokenScope, "write") === false)) {
+      $authHelper->verifyAuthToken($jwtToken, $userId, $tokenScope);
+      if (stristr($request->getMethod(), "get") === false &&
+          stristr($tokenScope, "write") === false) {
         /*
          * If the request method is not GET and token scope is not write,
          * do not allow the request to pass through.
          */
-        $tokenValid = new Info(403, "Do not have required scope.", InfoType::ERROR);
+        throw new HttpForbiddenException("Do not have required scope.");
       }
-      if ($tokenValid === true) {
-        $groupName = "";
-        $groupName = strval($request->getHeaderLine('groupName'));
-        if (!empty($groupName)) { // if request contains groupName
-          $userHasGroupAccess = $authHelper->userHasGroupAccess($userId, $groupName);
-          if ($userHasGroupAccess === true) {
-            $authHelper->updateUserSession($userId, $tokenScope, $groupName);
-            $response = $next($request, $response);
-          } else { // no group access or group does not exist
-            $response = $response->withJson($userHasGroupAccess->getArray(),
-            $userHasGroupAccess->getCode());
-          }
-        } else { // no groupName passed, use defult groupId saved in DB
-          $authHelper->updateUserSession($userId, $tokenScope);
-          $response = $next($request, $response);
-        }
-      } else {
-        $response = $response->withJson($tokenValid->getArray(),
-          $tokenValid->getCode());
+      $groupName = $request->getHeaderLine('groupName');
+      if (!empty($groupName)) { // if request contains groupName
+        $authHelper->userHasGroupAccess($userId, $groupName);
+        $authHelper->updateUserSession($userId, $tokenScope, $groupName);
+      } else { // no groupName passed, use default groupId saved in DB
+        $authHelper->updateUserSession($userId, $tokenScope);
       }
+      $response = $handler->handle($request);
     }
-    return $response;
+    return CorsHelper::addCorsHeaders($response);
   }
 }

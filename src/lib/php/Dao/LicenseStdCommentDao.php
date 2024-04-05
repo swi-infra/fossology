@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2019 Siemens AG
- * Author: Gaurav Mishra <mishra.gaurav@siemens.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+ Author: Gaurav Mishra <mishra.gaurav@siemens.com>
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * DAO layer for license_std_comment table.
@@ -24,6 +13,7 @@ namespace Fossology\Lib\Dao;
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Db\DbManager;
+use Fossology\Lib\Util\StringOperation;
 
 /**
  * @class LicenseStdCommentDao
@@ -81,7 +71,8 @@ class LicenseStdCommentDao
       "WHERE lsc_pk = $1 " .
       "RETURNING 1 AS updated;";
     $row = $this->dbManager->getSingleRow($sql,
-      [$commentPk, $newName, $newComment, $userFk]);
+      [$commentPk, $newName,
+        StringOperation::replaceUnicodeControlChar($newComment), $userFk]);
     return $row['updated'] == 1;
   }
 
@@ -112,7 +103,7 @@ class LicenseStdCommentDao
 
     $params = [
       'name' => $name,
-      'comment' => $comment,
+      'comment' => StringOperation::replaceUnicodeControlChar($comment),
       'user_fk' => $userFk
     ];
     $statement = __METHOD__ . ".insertNewLicStdComment";
@@ -164,13 +155,13 @@ class LicenseStdCommentDao
         $statement .= ".name";
       }
       if (array_key_exists("comment", $comment)) {
-        $params[] = $comment["comment"];
+        $params[] = StringOperation::replaceUnicodeControlChar($comment["comment"]);
         $updateStatement[] = "comment = $" . count($params);
         $statement .= ".comment";
       }
       $sql = "UPDATE license_std_comment " .
         "SET updated = NOW(), user_fk = $2, " . join(",", $updateStatement) .
-        "WHERE lsc_pk = $1 " .
+        " WHERE lsc_pk = $1 " .
         "RETURNING 1 AS updated;";
       $retVal = $this->dbManager->getSingleRow($sql, $params, $statement);
       $updated += intval($retVal);

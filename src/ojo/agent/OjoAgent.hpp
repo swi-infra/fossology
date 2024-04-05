@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * OjoAgent - the regex runner
@@ -23,6 +12,7 @@
 
 #include <boost/regex.hpp>
 #include <fstream>
+#include <sstream>
 
 #include "OjosDatabaseHandler.hpp"
 #include "ojomatch.hpp"
@@ -37,7 +27,8 @@ class OjoAgent
   public:
     OjoAgent();
     std::vector<ojomatch> processFile(const std::string &filePath,
-      OjosDatabaseHandler &databaseHandler);
+      OjosDatabaseHandler &databaseHandler, const int groupId,
+      const int userId);
     std::vector<ojomatch> processFile(const std::string &filePath);
   private:
     /**
@@ -53,7 +44,8 @@ class OjoAgent
         std::vector<ojomatch> &result, unsigned int offset, bool isDualTest);
     void filterMatches(std::vector<ojomatch> &matches);
     void findLicenseId(std::vector<ojomatch> &matches,
-      OjosDatabaseHandler &databaseHandler);
+      OjosDatabaseHandler &databaseHandler, const int groupId,
+      const int userId);
 };
 
 #endif /* SRC_OJO_AGENT_OJOAGENT_HPP_ */

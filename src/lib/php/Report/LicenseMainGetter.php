@@ -1,21 +1,10 @@
 <?php
 /*
- Copyright (C) 2016-2017, Siemens AG
+ SPDX-FileCopyrightText: © 2016-2017 Siemens AG
  Author: Daniele Fognini, Shaheem Azmal M MD
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\Report;
 
@@ -53,21 +42,23 @@ class LicenseMainGetter extends ClearedGetterCommon
       $allStatements[] = array(
         'licenseId' => $originLicenseId,
         'risk' => $allLicenseCols->getRisk(),
-        'content' => $licenseMap->getProjectedShortname($originLicenseId),
-        'text' => $allLicenseCols->getText()
+        'content' => $licenseMap->getProjectedSpdxId($originLicenseId),
+        'text' => $allLicenseCols->getText(),
+        'name' => $licenseMap->getProjectedShortname($originLicenseId,
+            $allLicenseCols->getShortName())
       );
-
     }
     return $allStatements;
   }
 
-  public function getCleared($uploadId, $groupId=null, $extended=true, $agentcall=null, $isUnifiedReport=false)
+  public function getCleared($uploadId, $objectAgent, $groupId=null, $extended=true, $agentcall=null, $isUnifiedReport=false)
   {
     $uploadTreeTableName = $this->uploadDao->getUploadtreeTableName($uploadId);
     $statements = $this->getStatements($uploadId, $uploadTreeTableName, $groupId);
     if (!$extended) {
       for ($i=0; $i<=count($statements); $i++) {
         unset($statements[$i]['risk']);
+        unset($statements[$i]['licenseId']);
       }
     }
     return array("statements" => array_values($statements));

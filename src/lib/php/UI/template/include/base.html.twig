@@ -1,16 +1,14 @@
-{# Copyright 2014-2015 Siemens AG
+{# SPDX-FileCopyrightText: © 2014-2015 Siemens AG
 
-   Copying and distribution of this file, with or without modification,
-   are permitted in any medium without royalty provided the copyright notice and this notice are preserved.
-   This file is offered as-is, without any warranty.
+   SPDX-License-Identifier: FSFAP
 #}
 {# Set common list of agents. Displayed by various pages #}
 {%
-  set agent_list = "(N: nomos, M: monk, Nk: ninka, I: reportImport, O: ojo)"
+  set agent_list = "(N: nomos, M: monk, Nk: ninka, I: reportImport, O: ojo, Sc: scancode, Sp: spasht, Rs: reso, So: scanoss)"
 %}
 <!DOCTYPE html>
-<html>
-  <head lang="en">
+<html lang="en">
+  <head>
     {% block head %}
       {% include "include/head.html.twig" %}
       <title>{% block title %}{{ title|e }}{% endblock %}</title>
@@ -27,17 +25,25 @@
 
     {% block micromenu %}
       {% if micromenu %}
-        <div style="border: thin dotted gray; background-color:lightyellow;">
+        <div class='alert alert-info' style='padding:5px;'>
           {{ micromenu }}
         </div>
       {% endif %}
     {% endblock %}
 
     {% block message %}
-      <div id="dmessage" style="border-bottom: 1px dashed gray;">
-        <button name="eraseme" value="close" onclick="rmMsg();">{{ 'Close'| trans }}</button>
-        {% if message %}  {{ message|raw|nl2br }} {% endif %}
-      </div>
+      
+      {% if progressBar %}
+        <div class="progress" style="height:30px">
+          <div class="progress-bar bg-success" style="{{ progressBar }}">{% if message %}  {{ message|raw|nl2br }} {% endif %}</div>
+        </div>
+      {% else %}
+        <div id="dmessage" style="border-bottom: 1px dashed gray;">
+          <button name="eraseme" class="btn btn-default btn-sm" value="close" onclick="rmMsg();">{{ 'Close'| trans }}</button>
+          {% if message %}  {{ message|raw|nl2br }} {% endif %}
+        </div>
+      {% endif %}
+
       <script type="text/javascript">
         function rmMsg() {
           var div = document.getElementById("dmessage");

@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2010-2015 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2010-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
@@ -87,10 +76,8 @@ class list_bucket_files extends FO_Plugin
    */
   function Initialize()
   {
-    $this->State=PLUGIN_STATE_VALID;
     $this->State=PLUGIN_STATE_READY;
-
-    return(true);
+    return true;
   } // Initialize()
 
 
@@ -226,13 +213,13 @@ class list_bucket_files extends FO_Plugin
         {
           $row = $file_result_temp[$i];
           if (empty($row)) continue;
-          array_push($sourted_file_result, $row);
+          $sourted_file_result[] = $row;
           for($j = $i + 1; $j < $max_num; $j++)
           {
             $row_next = $file_result_temp[$j];
             if (!empty($row_next) && ($row['pfile_fk'] == $row_next['pfile_fk']))
             {
-              array_push($sourted_file_result, $row_next);
+              $sourted_file_result[] = $row_next;
               $file_result_temp[$j] = null;
             }
           }

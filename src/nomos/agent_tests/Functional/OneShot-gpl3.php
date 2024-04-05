@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2012-2013 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2012-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Perform a one-shot license analysis on a glpv3 license
@@ -54,7 +43,7 @@ class OneShotgpl3Test extends CommonCliTest
     list(,$fname,,,$license) = explode(' ', $output);
 
     $this->assertEquals($fname, 'gpl-3.0.txt', "Error filename $fname does not equal gpl-3.0.txt");
-    $this->assertEquals(trim($license), 'GPL-3.0',
+    $this->assertEquals(trim($license), 'GPL-3.0-only',
       "Error license does not equal FSF,GPL_v3. $license was returned");
   }
 }

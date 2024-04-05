@@ -1,21 +1,9 @@
-/***************************************************************
- Copyright (C) 2006-2015 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2017-2019 Bittium Wireless Ltd.
+/*
+ SPDX-FileCopyrightText: © 2006-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2017-2019 Bittium Wireless Ltd.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
- ***************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /* Equivalent to version 1.83 of Core Nomos code. */
 #include <ctype.h>
 
@@ -26,7 +14,7 @@
 #include "util.h"
 #include "nomos_regex.h"
 #include "nomos_utils.h"
-#include "_autodefs.h"
+#include <_autodefs.h>
 
 /* DEBUG
 #define DOCTOR_DEBUG 1
@@ -565,7 +553,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /*
    * Check Apache licenses before BSD
    */
-  if (HASTEXT(_PHR_Apache_ref0, REG_EXTENDED) || INFILE(_PHR_Apache_ref7)) {
+  if (HASTEXT(_PHR_Apache_ref0, REG_EXTENDED) || INFILE(_PHR_Apache_ref7) || INFILE(_TITLE_Apache)) {
     cp = ASLVERS();
     INTERESTING(cp);
   }
@@ -586,7 +574,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       lmem[_mPHP] = 1;
     }
     else if (INFILE(_TITLE_PHP202)) {
-      INTERESTING(lDebug ? "PHP(v2.0.2#1)" : "PHP-2.0.2");
+      INTERESTING(lDebug ? "PHP(v2.02#1)" : "PHP-2.02");
       lmem[_mPHP] = 1;
     }
     else if (INFILE(_CR_VOVIDA) || INFILE(_TITLE_VOVIDA)) {
@@ -612,10 +600,6 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     else if (INFILE(_CR_SLEEPYCAT) || INFILE(_LT_SLEEPYCAT_1)) {
       MEDINTEREST(lDebug ? "Sleepycat(1)" : "Sleepycat");
     }
-    else if (INFILE(_TITLE_PHP202)) {
-      INTERESTING(lDebug ? "PHP(v2.0.2#2)" : "PHP-2.0.2");
-      lmem[_mPHP] = 1;
-    }
     else if (INFILE(_TITLE_ZEND_V20)) {
       INTERESTING("Zend-2.0");
     }
@@ -632,6 +616,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
         }
         else if (INFILE(_LT_BSD_CLAUSE_4) && INFILE(_LT_BSD_CLAUSE_CLEAR)) {
           INTERESTING("BSD-3-Clause-Clear");
+        }
+        else if (INFILE(_LT_BSD_CLAUSE_4) && INFILE(_LT_BSD_CLAUSE_OPEN_MPI)) {
+          INTERESTING("BSD-3-Clause-Open-MPI");
         }
         else if (INFILE(_LT_BSD_CLAUSE_4) && HASTEXT(_KW_severability, REG_EXTENDED)) {
           INTERESTING("BSD-3-Clause-Severability");
@@ -652,7 +639,12 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
           INTERESTING("BSD-3-Clause-Attribution");
         }
         else if (!lmem[_mAPACHE10] && !lmem[_mAPACHE11] && INFILE(_LT_BSD_CLAUSE_4)) {
-          INTERESTING("BSD-3-Clause");
+          if (INFILE(_LT_DARPA_COUGAAR_2)) {
+            INTERESTING("DARPA-Cougaar");
+          }
+          else {
+            INTERESTING("BSD-3-Clause");
+          }
         }
         else if (INFILE(_LT_SSLEAY)) {
           INTERESTING("SSLeay");
@@ -683,6 +675,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       else if (INFILE(_CR_CRYPTOGAMS)) {
         INTERESTING("Cryptogams");
       }
+      else if (INFILE(_LT_BSD_SHORTENED_CLAUSE_0) && INFILE(_LT_BSD_SHORTENED_CLAUSE_1) && INFILE(_LT_BSD_SHORTENED_CLAUSE_2) && INFILE(_LT_BSD_CLAUSE_3)) {
+        INTERESTING("BSD-4-Clause-Shortened");
+      }
       else if (INFILE(_CR_BSDCAL)) {
         INTERESTING(lDebug ? "BSD(1)" : "BSD");
       }
@@ -705,6 +700,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       }
       else if (INFILE(_LT_BSD_CLAUSE_1_DISCLAIMER)) {
         INTERESTING("BSD-1-Clause");
+      }
+      else if (INFILE(_LT_Spencer_99) && INFILE(_CR_Spencer)) {
+        INTERESTING("Spencer-99");
       }
       else if (!lmem[_fZPL]) {
         INTERESTING(lDebug ? "BSD-style(1)" : "BSD-style");
@@ -762,6 +760,10 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       INTERESTING("WordNet-3.0");
       lmem[_mMIT] = 1;
     }
+    else if (INFILE(_LT_HPND_1) && INFILE(_LT_HPND_2)) {
+      INTERESTING("HPND");
+      lmem[_mMIT] = 1;
+    }
     else if (INFILE(_LT_NOT_ADVERTISING)) {
       INTERESTING(lDebug ? "BSD-style(2)" : "BSD-style");
     }
@@ -782,6 +784,12 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     }
     else if (INFILE(_TITLE_OZPLB_10)) {
       INTERESTING("OZPLB-1.0");
+    }
+    /*
+     * JPNIC
+     */
+    else if (HASTEXT(_TEXT_JPNIC, 0) && INFILE(_LT_JPNIC)) {
+      INTERESTING("JPNIC");
     }
     else if (NOT_INFILE(_CR_XFREE86) && NOT_INFILE(_TITLE_NCSA) && NOT_INFILE(_TITLE_INNERNET200)) {
       INTERESTING(lDebug ? "BSD-style(3)" : "BSD-style");
@@ -919,6 +927,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (INFILE(_SPDX_BSD_3_Clause_LBNL)) {
     INTERESTING("BSD-3-Clause-LBNL");
   }
+  else if (INFILE(_SPDX_BSD_3_Clause_Open_MPI)) {
+    INTERESTING("BSD-3-Clause-Open-MPI");
+  }
   else if (INFILE(_SPDX_BSD_3_Clause)) {
     INTERESTING("BSD-3-Clause");
   }
@@ -933,6 +944,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if (INFILE(_SPDX_BSD_2_Clause_Patent)) {
     INTERESTING("BSD-2-Clause-Patent");
+  }
+  else if (INFILE(_SPDX_BSD_2_Clause_Views)) {
+    INTERESTING("BSD-2-Clause-Views");
   }
   else if (INFILE(_SPDX_BSD_2_Clause_1)) {
     INTERESTING("BSD-2-Clause");
@@ -971,6 +985,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if (INFILE(_SPDX_BSD_1_Clause)) {
     INTERESTING("BSD-1-Clause");
+  }
+  else if (INFILE(_PHR_0BSD)) {
+    INTERESTING("0BSD");
   }
   else if (INFILE(_LT_BSDref1)) {
     INTERESTING(lDebug ? "BSD(ref1)" : "BSD");
@@ -1014,6 +1031,10 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if (INFILE(_LT_BSDref14)) {
     INTERESTING(lDebug ? "BSD(ref14)" : "BSD");
+    lmem[_fBSD] = 1;
+  }
+  else if (INFILE(_LT_BSDref15)) {
+    INTERESTING(lDebug ? "BSD(ref15)" : "BSD");
     lmem[_fBSD] = 1;
   }
   else if (INFILE(_LT_BSDSTYLEref1)) {
@@ -1064,7 +1085,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       INTERESTING(lDebug ? "PHP(v3.0#2)" : "PHP-3.0");
     }
     else if (INFILE(_TITLE_PHP202)) {
-      INTERESTING(lDebug ? "PHP(v2.0.2#3)" : "PHP-2.0.2");
+      INTERESTING(lDebug ? "PHP(v2.02#3)" : "PHP-2.02");
     }
     else if (INFILE(_CR_PHP)) {
       INTERESTING(lDebug ? "PHP(1)" : "PHP");
@@ -1236,6 +1257,15 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     INTERESTING("OFL-1.0");
     lmem[_fOFL] = 1;
   }
+  else if (INFILE(_SPDX_OFL_10_no_RFN)) {
+    INTERESTING("OFL-1.0-no-RFN");
+  }
+  else if (INFILE(_SPDX_OFL_10_RFN)) {
+    INTERESTING("OFL-1.0-RFN");
+  }
+  else if (INFILE(_SPDX_OFL_10)) {
+    INTERESTING("OFL-1.0");
+  }
   else if (INFILE(_PHR_OPEN_FONT_V10_1) || INFILE(_PHR_OPEN_FONT_V10_2))
   {
     INTERESTING("OFL-1.0");
@@ -1245,6 +1275,15 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   {
     INTERESTING("OFL-1.1");
     lmem[_fOFL] = 1;
+  }
+  else if (INFILE(_SPDX_OFL_11_no_RFN)) {
+    INTERESTING("OFL-1.1-no-RFN");
+  }
+  else if (INFILE(_SPDX_OFL_11_RFN)) {
+    INTERESTING("OFL-1.1-RFN");
+  }
+  else if (INFILE(_SPDX_OFL_11)) {
+    INTERESTING("OFL-1.1");
   }
   else if (INFILE(_PHR_OPEN_FONT_V11_1) || INFILE(_PHR_OPEN_FONT_V11_2))
   {
@@ -1267,18 +1306,18 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
    * It has to be checked before GPL because the license has the reference
    * to GPL license which gives a false positive GPL finding.
    */
-  if (INFILE(_TITLE_COPYLEFT_NEXT_030) && INFILE(_PHR_COPYLEFT_NEXT_PARA1) && INFILE(_PHR_COPYLEFT_NEXT_PARA3)) {
+  if (INFILE(_TITLE_copyleft_next_030) && INFILE(_PHR_copyleft_next_PARA1) && INFILE(_PHR_copyleft_next_PARA3)) {
     INTERESTING("copyleft-next-0.3.0");
     lmem[_mGPL] = 1;
   }
-  else if (INFILE(_TITLE_COPYLEFT_NEXT_031) && INFILE(_PHR_COPYLEFT_NEXT_PARA1) && INFILE(_PHR_COPYLEFT_NEXT_PARA3)) {
+  else if (INFILE(_TITLE_copyleft_next_031) && INFILE(_PHR_copyleft_next_PARA1) && INFILE(_PHR_copyleft_next_PARA3)) {
     INTERESTING("copyleft-next-0.3.1");
     lmem[_mGPL] = 1;
   }
-  else if (INFILE(_PHR_COPYLEFT_NEXT_030) || INFILE(_SPDX_copyleft_next_030)) {
+  else if (INFILE(_PHR_copyleft_next_030) || INFILE(_SPDX_copyleft_next_030)) {
     INTERESTING("copyleft-next-0.3.0");
   }
-  else if (INFILE(_PHR_COPYLEFT_NEXT_031) || INFILE(_SPDX_copyleft_next_031)) {
+  else if (INFILE(_PHR_copyleft_next_031) || INFILE(_SPDX_copyleft_next_031)) {
     INTERESTING("copyleft-next-0.3.1");
   }
   cleanLicenceBuffer();
@@ -1331,26 +1370,26 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       lmem[_mGPL] = 1;
     }
     else if (INFILE(_LT_GPL_V1)) {
-      INTERESTING("GPL-1.0");
+      INTERESTING("GPL-1.0-only");
       lmem[_mGPL] = 1;
     }
     else if (INFILE(_LT_GPL_1) && !HASTEXT(_LT_GPL_EXCEPT_0, REG_EXTENDED)) {
       if (INFILE(_PHR_GPL2_OR_LATER_1) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#1)" : "GPL-2.0+");
+        INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#1)" : "GPL-2.0-or-later");
         lmem[_mGPL] = 1;
       }
       else if (INFILE(_TITLE_GPL2)) {
-        INTERESTING(lDebug ? "Title(GPL-2.0)" : "GPL-2.0");
+        INTERESTING(lDebug ? "Title(GPL-2.0-only)" : "GPL-2.0-only");
         lmem[_mGPL] = 1;
       }
       else if (INFILE(_PHR_GPL1_OR_LATER) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING("GPL-1.0+");
+        INTERESTING("GPL-1.0-or-later");
         lmem[_mGPL] = 1;
       }
       else if (INFILE(_TITLE_GPL1)) {
-        INTERESTING("GPL-1.0");
+        INTERESTING("GPL-1.0-only");
         lmem[_mGPL] = 1;
       }
       else {
@@ -1361,58 +1400,58 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     else if ((INFILE(_LT_GPL_V2) || INFILE(_LT_GPL_V2_ref) || INFILE(_LT_GPL_V2_ref1) || INFILE(_LT_GPL_V2_ref2)) && !HASTEXT(_LT_GPL_EXCEPT_0, REG_EXTENDED)) {
       if (INFILE(_PHR_GPL2_OR_LATER_1) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#2)" : "GPL-2.0+");
+        INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#2)" : "GPL-2.0-or-later");
         lmem[_mGPL] = 1;
       }
       else {
-        INTERESTING(lDebug ? "LT(GPL-V2)" : "GPL-2.0");
+        INTERESTING(lDebug ? "LT(GPL-V2)" : "GPL-2.0-only");
         lmem[_mGPL] = 1;
       }
     }
     else if (INFILE(_PHR_GPL2_OR_LATER_2))
     {
-      INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#2)" : "GPL-2.0+");
+      INTERESTING(lDebug ? "PHR(GPL2_OR_LATER#2)" : "GPL-2.0-or-later");
       lmem[_mGPL] = 1;
     }
     else if (INFILE(_LT_GPL3_PATENTS)) {
       if (INFILE(_TITLE_GPL3)) {
-        INTERESTING(lDebug ? "GPL_v3(#1)" : "GPL-3.0");
+        INTERESTING(lDebug ? "GPL_v3(#1)" : "GPL-3.0-only");
         lmem[_mGPL] = 1;
       }
       else {
-        INTERESTING("GPL-3.0-possibility");
+        INTERESTING("GPL-3.0-only-possibility");
         lmem[_mGPL] = 1;
       }
     }
     else if (INFILE(_TITLE_GPL3_ref3_later)) {
-      INTERESTING("GPL-3.0+");
+      INTERESTING("GPL-3.0-or-later");
       lmem[_mGPL] = 1;
     }
     else if (INFILE(_TITLE_GPL3_ref4_later)) {
-      INTERESTING("GPL-3.0+");
+      INTERESTING("GPL-3.0-or-later");
       lmem[_mGPL] = 1;
     }
     else if (INFILE(_TITLE_GPL3_ref3)) {
-      INTERESTING("GPL-3.0");
+      INTERESTING("GPL-3.0-only");
       lmem[_mGPL] = 1;
     }
     if (INFILE(_LT_LGPL_1) || INFILE(_LT_LGPL_2)) {
       if (INFILE(_PHR_LGPL21_OR_LATER_1) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING("LGPL-2.1+");
+        INTERESTING("LGPL-2.1-or-later");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_PHR_LGPL2_OR_LATER) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING("LGPL-2.0+");
+        INTERESTING("LGPL-2.0-or-later");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_TITLE_LGPLV21)) {
-        INTERESTING("LGPL-2.1");
+        INTERESTING("LGPL-2.1-only");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_TITLE_LGPLV2)) {
-        INTERESTING("LGPL-2.0");
+        INTERESTING("LGPL-2.0-only");
         lmem[_mLGPL] = 1;
       }
       else {
@@ -1426,15 +1465,15 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
           || INFILE(_PHR_LGPL3_OR_LATER_ref2))
           && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING("LGPL-3.0+");
+        INTERESTING("LGPL-3.0-or-later");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_TITLE_LGPL3)) {
-        INTERESTING("LGPL-3.0");
+        INTERESTING("LGPL-3.0-only");
         lmem[_mLGPL] = 1;
       }
       else {
-        INTERESTING("LGPL-3.0-possibility");
+        INTERESTING("LGPL-3.0-only-possibility");
         lmem[_mLGPL] = 1;
       }
     }
@@ -1458,7 +1497,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_LT_LGPL3_ref_later)) {
-        INTERESTING("LGPL-3.0+");
+        INTERESTING("LGPL-3.0-or-later");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_LT_LGPLref1)) {
@@ -1542,11 +1581,11 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_PHR_LGPL21_OR_LATER_2)) {
-        INTERESTING(lDebug ? "LGPL-2.1+(_LATER_2)" : "LGPL-2.1+");
+        INTERESTING(lDebug ? "LGPL-2.1-or-later(_LATER_2)" : "LGPL-2.1-or-later");
         lmem[_mLGPL] = 1;
       }
       else if (INFILE(_PHR_LGPL21_ONLY_ref) || INFILE(_TITLE_LGPLV21_2)) {
-        INTERESTING("LGPL-2.1");
+        INTERESTING("LGPL-2.1-only");
         lmem[_mLGPL] = 1;
       }
     }
@@ -1560,15 +1599,15 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
             || GPL_INFILE(_PHR_GPL3_OR_LATER_ref1) || GPL_INFILE(_PHR_GPL3_OR_LATER_ref2))
             && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
       {
-        INTERESTING("GPL-3.0+");
+        INTERESTING("GPL-3.0-or-later");
         lmem[_mGPL] = 1;
       }
       else if (GPL_INFILE(_LT_GPL3ref)) {
-        INTERESTING(lDebug ? "GPL_v3(#2)" : "GPL-3.0");
+        INTERESTING(lDebug ? "GPL_v3(#2)" : "GPL-3.0-only");
         lmem[_mGPL] = 1;
       }
       else if (GPL_INFILE(_LT_GPL3ref3) && NOT_INFILE(_TITLE_LGPL3)) {
-        INTERESTING("GPL-3.0");
+        INTERESTING("GPL-3.0-only");
         lmem[_mGPL] = 1;
       }
       else if (!lmem[_mLIBRE] && GPL_INFILE(_LT_GPLref1)
@@ -1745,7 +1784,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     }
     /* checking for FSF */
     if (INFILE(_LT_FSF_1)) {
-      INTERESTING(lDebug ? "FSF(1)" : "FSF");
+      INTERESTING(lDebug ? "FSF(1)" : "FSFULLR");
       lmem[_mLGPL] = 1;
     }
     else if (INFILE(_LT_FSF_2)) {
@@ -1759,6 +1798,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     }
     else if (!lmem[_mGPL] && mCR_FSF() && INFILE(_LT_FSF_5)) {
       INTERESTING(lDebug ? "FSF(5)" : "FSF");
+    }
+    else if (!lmem[_mGPL] && INFILE(_LT_FSFUL)) {
+      INTERESTING("FSFUL");
     }
     else if (!lmem[_mGPL] && NOT_INFILE(_LT_Autoconf_exception_20) && INFILE(_LT_FSFref1)) {
       INTERESTING(lDebug ? "FSF(ref1)" : "FSF");
@@ -1814,7 +1856,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   cleanLicenceBuffer();
   if (HASTEXT(_LT_GPL_V2_NAMED_later, REG_EXTENDED) || HASTEXT(_TITLE_GPL2_ref1_later, REG_EXTENDED))
   {
-    INTERESTING(lDebug ? "GPLV2+(named)" : "GPL-2.0+");
+    INTERESTING(lDebug ? "GPLV2+(named)" : "GPL-2.0-or-later");
     lmem[_mGPL] = 1;
   }
   else if (INFILE(_LT_TAPJOY) || INFILE(_LT_TAPJOY_ref1)) {
@@ -1845,16 +1887,16 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if ( !lmem[_mGPL] && !INFILE(_TITLE_MIROS) && (INFILE(_LT_GPL_V2_NAMED) || INFILE(_LT_GPL_V2_NAMED_ref1)))
   {
-    INTERESTING(lDebug ? "GPLV2(named)" : "GPL-2.0");
+    INTERESTING(lDebug ? "GPLV2(named)" : "GPL-2.0-only");
     lmem[_mGPL] = 1;
   }
   else if (!lmem[_mGPL] && INFILE(_LT_GPL_V3_NAMED_later))
   {
-    INTERESTING(lDebug ? "GPLV3(named_later)" : "GPL-3.0+");
+    INTERESTING(lDebug ? "GPLV3(named_later)" : "GPL-3.0-or-later");
   }
   else if (!lmem[_mGPL] && INFILE(_LT_GPL_V3_NAMED))
   {
-    INTERESTING(lDebug ? "GPLV3(named)" : "GPL-3.0");
+    INTERESTING(lDebug ? "GPLV3(named)" : "GPL-3.0-only");
   }
   cleanLicenceBuffer();
   if (!lmem[_mLGPL] && (INFILE(_LT_LGPL_NAMED)
@@ -2111,6 +2153,10 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
       INTERESTING(lDebug ? "MIT(6)" : "MIT");
       lmem[_mMIT] = 1;
     }
+    else if (!lmem[_mMIT] && INFILE(_LT_HPND_1) && INFILE(_LT_HPND_2)) {
+      INTERESTING("HPND-sell-variant");
+      lmem[_mMIT] = 1;
+    }
     /*
      * _LT_MIT_6 is very similar to _LT_BSD_2 where MIT-CMU licenses
      * are also detected. Following else if is the copy from there.
@@ -2267,7 +2313,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /*
    * ISC License
    */
-  if (INFILE(_PHR_ISC_1) || INFILE(_PHR_ISC_2) || HASTEXT(_URL_ISC, 0)) {
+  if (INFILE(_PHR_ISC_1) || INFILE(_PHR_ISC_2) || HASTEXT(_URL_ISC, REG_EXTENDED)) {
     INTERESTING(lDebug ? "PHR(ISC)" : "ISC");
     lmem[_mISC] = 1;
   }
@@ -2308,7 +2354,10 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     lmem[_fW3C] = 1;
   }
   else if (!lmem[_mNTP] && !lmem[_mPYTHON] && !lmem[_fBSD] && INFILE(_LT_W3C_2)) {
-    if (INFILE(_CR_W3C)) {
+    if (INFILE(_LT_W3C_19980720)) {
+      INTERESTING("W3C-19980720");
+    }
+    else if (INFILE(_CR_W3C)) {
       INTERESTING(lDebug ? "W3C(2)" : "W3C");
     }
     else {
@@ -2317,10 +2366,18 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     lmem[_fW3C] = 1;
   }
   else if (INFILE(_LT_W3C_3)) {
-    if (INFILE(_CR_W3C)) {
+    if (INFILE(_LT_W3C_8)) {
+      if (INFILE(_LT_W3C_20021231)) {
+        INTERESTING("W3C");
+      }
+      else if (INFILE(_LT_W3C_20150513)) {
+        INTERESTING("W3C-20150513");
+      }
+    }
+    else if (INFILE(_CR_W3C)) {
       INTERESTING(lDebug ? "W3C(3)" : "W3C");
     }
-    if (INFILE(_LT_W3Cref4)) {
+    else if (INFILE(_LT_W3Cref4)) {
       INTERESTING(lDebug ? "W3C(ref4)" : "W3C");
     }
     else {
@@ -2359,6 +2416,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     if (INFILE(_CR_W3C)) {
       INTERESTING(lDebug ? "W3C(7)" : "W3C");
     }
+    else if (INFILE(_LT_OGC)) {
+      INTERESTING("OGC");
+    }
     else {
       INTERESTING(lDebug ? "W3C-style(7)" : "W3C-style");
     }
@@ -2393,7 +2453,10 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     lmem[_fW3C] = 1;
   }
   else if (!lmem[_mMIT] && INFILE(_LT_MIT_3)) {
-    if (mCR_MIT()) {
+    if (INFILE(_LT_NTP_0)) {
+      INTERESTING("NTP-0");
+    }
+    else if (mCR_MIT()) {
       INTERESTING(lDebug ? "MIT(8)" : "MIT");
     }
     else {
@@ -2518,6 +2581,12 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (HASTEXT(_TEXT_TU_BERLIN, 0) && HASTEXT(_LT_FREE_87,0)) {
     INTERESTING("TU-Berlin-1.0");
   }
+  else if (INFILE(_LT_NIST_1) && INFILE(_LT_NIST_2)) {
+    INTERESTING(lDebug ? "NIST" : "MIT-style");
+  }
+  else if (INFILE(_LT_FSFAP)) {
+    INTERESTING("FSFAP");
+  }
   cleanLicenceBuffer();
   /*
    * Generic CopyLeft licenses
@@ -2580,7 +2649,12 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if (!lmem[_fW3C] && INFILE(_LT_PNG_ZLIB_2)) {
     if (INFILE(_LT_libmng_2007_Clause_1)) {
-      INTERESTING("libmng-2007");
+      if (HASTEXT(_LT_libmng_2007_1, 0)) {
+        INTERESTING("libmng-2007");
+      }
+      else if (INFILE(_LT_libpng_20_Clause_1)) {
+        INTERESTING("libpng-2.0");
+      }
     }
     else {
       INTERESTING(lDebug ? "PNG/ZLIB(2)" : "Libpng");
@@ -3141,6 +3215,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (INFILE(_SPDX_Intel_ACPI)) {
     INTERESTING("Intel-ACPI");
   }
+  else if (INFILE(_LT_ISSL_1) && INFILE(_LT_ISSL_2)) {
+    INTERESTING("ISSL");
+  }
   else if (!lmem[_fREAL] && INFILE(_SPDX_Intel)) {
     INTERESTING("Intel");
   }
@@ -3164,6 +3241,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     }
     else if (INFILE(_LT_INTEL_RESTRICT)) {
       INTERESTING("Intel.RESTRICTED");
+    }
+    else if (INFILE(_LT_INTEL_BINARY) && HASTEXT(_TEXT_INTELCORPBINARY, 0) && HASTEXT(_TEXT_NOMODIFICATION, 0)) {
+      INTERESTING("Intel-Binary");
     }
   }
   else if (INFILE(_LT_INTEL_5)) {
@@ -3199,16 +3279,21 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
    * Cisco systems
    */
   if (!lmem[_fPURDUE] && INFILE(_LT_CISCO)) {
-    if (INFILE(_CR_CISCO)) {
+    if (HASTEXT(_LT_PNG_ZLIB_CLAUSE_1, 0) &&
+        HASTEXT(_LT_PNG_ZLIB_CLAUSE_2, REG_EXTENDED) &&
+        HASTEXT(_LT_PNG_ZLIB_CLAUSE_3, 0)) {
+      if (INFILE(_LT_Spencer_86_94_CLAUSE_1) && INFILE(_LT_Spencer_94_CLAUSE_2)) {
+        INTERESTING("Spencer-94");
+      }
+      else {
+        INTERESTING("Zlib-style");
+      }
+    }
+    else if (INFILE(_CR_CISCO)) {
       INTERESTING("Cisco");
     }
     else {
-      if (HASTEXT(_LT_PNG_ZLIB_CLAUSE_1, 0) && HASTEXT(_LT_PNG_ZLIB_CLAUSE_2, REG_EXTENDED) && HASTEXT(_LT_PNG_ZLIB_CLAUSE_3, 0)) {
-        INTERESTING("Zlib-style");
-      }
-      else {
-        INTERESTING("Cisco-style");
-      }
+      INTERESTING("Cisco-style");
     }
   }
   cleanLicenceBuffer();
@@ -3873,13 +3958,6 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   cleanLicenceBuffer();
   /*
-   * JPNIC
-   */
-  if (HASTEXT(_TEXT_JPNIC, 0) && INFILE(_LT_JPNIC)) {
-    INTERESTING("JPNIC");
-  }
-  cleanLicenceBuffer();
-  /*
    * ADAPTEC
    */
   if (INFILE(_LT_ADAPTEC_OBJ)) {
@@ -3893,21 +3971,26 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
    * Artistic and Perl
    */
   if (INFILE(_LT_PERL_1)) {
-    INTERESTING(lDebug ? "Artistic(Perl#1)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl#1)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl#1)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl#1)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_LT_PERL_2)) {
-    INTERESTING(lDebug ? "Artistic(Perl#2)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl#2)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl#2)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl#2)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_LT_PERL_3)) {
-    if (!lmem[_fOPENLDAP] && !TRYGROUP(famOPENLDAP)) {
+    if (INFILE(_LT_Spencer_86_94_CLAUSE_1) &&
+        HASTEXT(_LT_PNG_ZLIB_CLAUSE_1, 0) &&
+        HASTEXT(_LT_PNG_ZLIB_CLAUSE_2, REG_EXTENDED)) {
+      INTERESTING("Spencer-86");
+    }
+    else if (!lmem[_fOPENLDAP] && !TRYGROUP(famOPENLDAP)) {
       INTERESTING(lDebug ? "Artistic(Perl#3)" : "Artistic-1.0");
     }
   }
@@ -3916,38 +3999,38 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
    * Larry Wall and the documented licensing terms of "perl"
    */
   else if (INFILE(_LT_PERLref1)) {
-    INTERESTING(lDebug ? "Artistic(Perl-ref1)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl-ref1)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl-ref1)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl-ref1)" : "GPL-1.0-or-later");
     }
   }
   else if (PERL_INFILE(_LT_PERLref2)) {
-    INTERESTING(lDebug ? "Artistic(Perl-ref2)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl-ref2)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl-ref2)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl-ref2)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_LT_PERLref3)) {
-    INTERESTING(lDebug ? "Artistic(Perl-ref3)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl-ref3)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl-ref3)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl-ref3)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_LT_PERLref4)) {
-    INTERESTING(lDebug ? "Artistic(Perl-ref4)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl-ref4)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl-ref4)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl-ref4)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_LT_PERLref5)) {
-    INTERESTING(lDebug ? "Artistic(Perl-ref5)" : "Artistic-1.0");
+    INTERESTING(lDebug ? "Artistic(Perl-ref5)" : "Artistic-1.0-Perl");
     if (!lmem[_mGPL]) {
       INTERESTING("Dual-license");
-      INTERESTING(lDebug ? "GPL(Perl-ref5)" : "GPL-1.0+");
+      INTERESTING(lDebug ? "GPL(Perl-ref5)" : "GPL-1.0-or-later");
     }
   }
   else if (INFILE(_TITLE_CLARTISTIC)) {
@@ -3966,6 +4049,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
         !TRYGROUP(famOPENLDAP)) {
       if (INFILE(_LT_ART_V2) || INFILE(_TITLE_ART20)) {
         INTERESTING(lDebug ? "Artistic(v2.0#1)" : "Artistic-2.0");
+      }
+      else if (INFILE(_PHR_Artistic_20)) {
+        INTERESTING("Artistic-2.0");
       }
       else if (INFILE(_TITLE_NBPL_V10)) {
         INTERESTING("NBPL-1.0");
@@ -4274,8 +4360,11 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /*
    * Vim license
    */
-  if ((INFILE(_LT_VIM_1) || INFILE(_LT_VIM_2)) && INFILE(_TITLE_VIM)) {
-    INTERESTING("VIM");
+  if ((INFILE(_LT_Vim_1) || INFILE(_LT_Vim_2)) && INFILE(_TITLE_Vim)) {
+    INTERESTING("Vim");
+  }
+  else if (INFILE(_PHR_Vim)) {
+    INTERESTING("Vim");
   }
   cleanLicenceBuffer();
   /*
@@ -4494,25 +4583,25 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /*
    * RSA Security, Inc.
    */
-  if (INFILE(_CR_RSA)) {
-    if (INFILE(_LT_RSA_1)) {
-      INTERESTING(lDebug ? "RSA(1)" : "RSA-Security");
-    }
-    else if (INFILE(_LT_RSA_2)) {
-      INTERESTING(lDebug ? "RSA(2)" : "RSA-Security");
-    }
-  }
-  else if (INFILE(_LT_RSA_3)) {
-    INTERESTING(lDebug ? "RSA(3)" : "RSA-Security");
-  }
-  else if (INFILE(_LT_RSA_4)) {
-    INTERESTING(lDebug ? "RSA(4)" : "RSA-Security");
+  if (INFILE(_LT_RSA_4)) {
+    INTERESTING(lDebug ? "RSA(4)" : "RSA-MD");
   }
   else if (INFILE(_LT_RSA_5)) {
     INTERESTING(lDebug ? "RSA(5)" : "RSA-DNS");
   }
   else if (INFILE (_LT_RSA_CRYPTOKI_1) && INFILE(_LT_RSA_CRYPTOKI_2)){
     INTERESTING("RSA-Cryptoki");
+  }
+  else if (INFILE(_LT_RSA_3)) {
+    INTERESTING(lDebug ? "RSA(3)" : "RSA-Security");
+  }
+  else if (INFILE(_CR_RSA)) {
+    if (INFILE(_LT_RSA_1)) {
+      INTERESTING(lDebug ? "RSA(1)" : "RSA-Security");
+    }
+    else if (INFILE(_LT_RSA_2)) {
+      INTERESTING(lDebug ? "RSA(2)" : "RSA-Security");
+    }
   }
   cleanLicenceBuffer();
   /* Some licenses only deal with fonts */
@@ -4723,6 +4812,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (INFILE(_LT_NVIDIA_EULA_1) || INFILE(_TITLE_NVIDIA)) {
     INTERESTING(lDebug ? "Nvidia(4)" : "Nvidia-EULA-b");
   }
+  else if (INFILE(_LT_NVIDIA_1)) {
+    INTERESTING(lDebug ? "Nvidia(5)" : "Nvidia");
+  }
   /*
    * ATI Corp
    */
@@ -4765,7 +4857,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /*
    * DARPA (Defense Advanved Research Projects Agency)
    */
-  if (INFILE(_LT_DARPA_COUGAAR)) {
+  if (INFILE(_LT_DARPA_COUGAAR_1)) {
     INTERESTING("DARPA-Cougaar");
   }
   else if (INFILE(_LT_DARPA)) {
@@ -6322,6 +6414,45 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     INTERESTING("unboundID-ldap-sdk");
   }
   cleanLicenceBuffer();
+  /*
+   * BlueOak-1.0.0
+   */
+  if (INFILE(_TITLE_BlueOak_100) || URL_INFILE(_URL_BlueOak_100)) {
+    INTERESTING("BlueOak-1.0.0");
+  }
+  else if (INFILE(_LT_BlueOak_100_Purpose) && INFILE(_LT_BlueOak_100_Acceptance)) {
+    INTERESTING("BlueOak-1.0.0");
+  }
+  cleanLicenceBuffer();
+  /*
+   * CERN-OHL
+   */
+  if (INFILE(_TITLE_CERN_OHL_11)) {
+    INTERESTING("CERN-OHL-1.1");
+  }
+  else if (INFILE(_TITLE_CERN_OHL_12)) {
+    INTERESTING("CERN-OHL-1.2");
+  }
+  cleanLicenceBuffer();
+  /*
+   * MulanPSL
+   */
+  if (INFILE(_TITLE_MulanPSL_10) || URL_INFILE(_URL_MulanPSL) || INFILE(_LT_MulanPSL_10)) {
+    INTERESTING("MulanPSL-1.0");
+  }
+  cleanLicenceBuffer();
+  /*
+   * SSH
+   */
+  if (INFILE(_LT_FREE_72) && HASTEXT(_LT_SSH, REG_EXTENDED)) {
+    if (INFILE(_LT_SSH_OpenSSH)) {
+      INTERESTING("SSH-OpenSSH");
+    }
+    else {
+      INTERESTING("SSH-short");
+    }
+  }
+  cleanLicenceBuffer();
 
   SPDXREF();
   cleanLicenceBuffer();
@@ -6422,7 +6553,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
      */
     if (!lmem[_mGPL]) {
       if (INFILE(_LT_DUAL_LICENSE_16)) {
-        INTERESTING(lDebug ? "GPLV2(Dual-license(16))" : "GPL-2.0");
+        INTERESTING(lDebug ? "GPLV2(Dual-license(16))" : "GPL-2.0-only");
       }
     }
   }
@@ -6439,7 +6570,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (INFILE(_LT_DUAL_LICENSE_16)) {
     INTERESTING(lDebug ? "Dual-license(16)" : "Dual-license");
     INTERESTING("MIT");
-    INTERESTING(lDebug ? "GPLV2(Dual-license(16))" : "GPL-2.0");
+    INTERESTING(lDebug ? "GPLV2(Dual-license(16))" : "GPL-2.0-only");
   }
   else if (INFILE(_LT_DUAL_LICENSE_17)) {
     MEDINTEREST(lDebug ? "Dual-license(17)" : "Dual-license");
@@ -6539,7 +6670,7 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   else if (INFILE(_LT_DUAL_LICENSE_48)) {
     MEDINTEREST(lDebug ? "Dual-license(48)" : "Dual-license");
   }
-  else if (INFILE(_LT_DUAL_LICENSE_49)) {
+  else if (HASTEXT(_LT_DUAL_LICENSE_49, REG_EXTENDED)) {
     MEDINTEREST(lDebug ? "Dual-license(49)" : "Dual-license");
   }
   cleanLicenceBuffer();
@@ -6580,6 +6711,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   else if (INFILE(_TITLE_CC0_10_1) || INFILE(_PHR_CC0_1) || INFILE(_PHR_CC0_2)) {
     INTERESTING("CC0-1.0");
+  }
+  else if (INFILE(_SPDX_CC0)) {
+    INTERESTING("CC0");
   }
   cleanLicenceBuffer();
   /*
@@ -6694,7 +6828,11 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   }
   cleanLicenceBuffer();
   /* Mozilla Public License possibility */
-  if (!lmem[_mMPL] && URL_INFILE(_URL_MPL_LATEST)) {
+  if (!lmem[_mMPL] && INFILE(_TEXT_MPLV2) && INFILE(_URL_MPL20)) {
+      INTERESTING("MPL-2.0");
+      lmem[_mMPL] = 1;
+  }
+  else if (!lmem[_mMPL] && URL_INFILE(_URL_MPL_LATEST)) {
     INTERESTING(lDebug ? "MPL(latest)" : "MPL");
   }
   cleanLicenceBuffer();
@@ -6730,12 +6868,12 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /* Some GPL cases are still missing */
   if (!lmem[_mGPL] && (INFILE(_LT_GPL_V2_ref) || INFILE(_LT_GPL_V2_ref1) || INFILE(_LT_GPL_V2_ref2) || INFILE(_LT_GPL_V2_ref3) || INFILE(_LT_GPL_V2_ref4)))
   {
-    INTERESTING(lDebug ? "GPL_V2_ref" : "GPL-2.0");
+    INTERESTING(lDebug ? "GPL_V2_ref" : "GPL-2.0-only");
     lmem[_mGPL] = 1;
   }
   else if (!lmem[_mGPL] && INFILE(_LT_GPL_V3_ref))
   {
-    INTERESTING(lDebug ? "GPL_V3_ref" : "GPL-3.0");
+    INTERESTING(lDebug ? "GPL_V3_ref" : "GPL-3.0-only");
     lmem[_mGPL] = 1;
   }
   else if (!lmem[_mGPL] && INFILE(_LT_GPLref22))
@@ -6769,12 +6907,13 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
   /* not public domain */
   if (HASTEXT(_LT_PUBDOM_NOTclaim, REG_EXTENDED)) {
     if (INFILE(_LT_PUBDOM_CC)) {
-      INTERESTING(lDebug ? "Pubdom(CC)" : LS_PD_CLM);
+      INTERESTING(lDebug ? "Pubdom(CC)" : "CC-PDDC");
+      pd = 1;
     }
     else {
       INTERESTING(LS_NOT_PD);
+      pd = 0;
     }
-    pd = 0;
   }
   cleanLicenceBuffer();
   /* LIBGCJ license */
@@ -7057,6 +7196,9 @@ char *parseLicenses(char *filetext, int size, scanres_t *scp,
     else if (INFILE(_LT_COMMERCIAL_6)) {
       INTERESTING(lDebug ? "COMM(6)" : "COMMERCIAL");
     }
+    else if (INFILE(_LT_COMMERCIAL_7)) {
+      INTERESTING(lDebug ? "COMM(7)" : "COMMERCIAL");
+    }
     if (INFILE(_LT_NONPROFIT_1)) {
       MEDINTEREST(lDebug ? "NonP(1)" : "Non-profit");
     }
@@ -7313,7 +7455,7 @@ char *aslVersion(char *filetext, int size, int isML, int isPS)
     lstr = (lDebug ? "Apache(2.0#2)" : "Apache-2.0");
     lmem[_mAPACHE] = 1;
   }
-  else if (INFILE(_PHR_Apache_20_ref4) || INFILE(_PHR_Apache_20_ref5) || INFILE(_PHR_Apache_20_ref6)) {
+  else if (INFILE(_PHR_Apache_20_ref4) || INFILE(_PHR_Apache_20_ref5) || INFILE(_PHR_Apache_20_ref6) || INFILE(_PHR_Apache_20_ref7)) {
     lstr = (lDebug ? "Apache(2.0#3)" : "Apache-2.0");
     lmem[_mAPACHE] = 1;
   }
@@ -7658,7 +7800,7 @@ char *pythonVersion(char *filetext, int size, int isML, int isPS)
   else if (INFILE(_TITLE_PYTHON23)) {
     lstr = "Python-2.3";
   }
-  else if (INFILE(_TITLE_PYTHON2)) {
+  else if (INFILE(_TITLE_PYTHON_20_1) || INFILE(_TITLE_PYTHON_20_2)) {
     lstr = "Python-2.0";
   }
   else {
@@ -7920,13 +8062,13 @@ char *agplVersion(char *filetext, int size, int isML, int isPS)
       || HASTEXT(_SPDX_AGPL_10plus, REG_EXTENDED)
       || HASTEXT(_PHR_AGPL_10plus, REG_EXTENDED))
   {
-    lstr = "AGPL-1.0+";
+    lstr = "AGPL-1.0-or-later";
   }
   else if (INFILE(_PHR_FSF_V1_ONLY)
       || INFILE(_TITLE_AGPL_10_only)
       || INFILE(_SPDX_AGPL_10))
   {
-    lstr = "AGPL-1.0";
+    lstr = "AGPL-1.0-only";
   }
   else if (INFILE(_PHR_AGPL_30_or_later)
       || INFILE(_TITLE_AGPL_30_or_later_ref1)
@@ -7936,34 +8078,34 @@ char *agplVersion(char *filetext, int size, int isML, int isPS)
       || HASTEXT(_PHR_AGPL_30plus, REG_EXTENDED))
   {
     if (INFILE(_LT_AGPL_30)) {
-      lstr = lDebug ? "Affero-v3(#1)" : "AGPL-3.0";
+      lstr = lDebug ? "Affero-v3(#1)" : "AGPL-3.0-only";
     }
     else {
-      lstr = "AGPL-3.0+";
+      lstr = "AGPL-3.0-or-later";
     }
   }
   else if (HASTEXT(_PHR_AGPL_30_1, REG_EXTENDED) || INFILE(_SPDX_AGPL_30)) {
-    lstr = "AGPL-3.0";
+    lstr = "AGPL-3.0-only";
   }
   else if (GPL_INFILE(_PHR_FSF_V3_ONLY)) {
     if (INFILE(_TITLE_GPL3)) {
-      lstr = lDebug ? "GPLv3(Affero#1)" : "GPL-3.0";
+      lstr = lDebug ? "GPLv3(Affero#1)" : "GPL-3.0-only";
     }
     else if (INFILE(_LT_GPL3ref3)){
-      lstr = lDebug ? "GPLv3(special)" : "GPL-3.0";
+      lstr = lDebug ? "GPLv3(special)" : "GPL-3.0-only";
     }
     else {
-      lstr = lDebug ? "Affero-v3(#2)" : "AGPL-3.0";
+      lstr = lDebug ? "Affero-v3(#2)" : "AGPL-3.0-only";
     }
   }
   else if (INFILE(_TITLE_AGPL_30_only)) {
-    lstr = lDebug ? "Affero-v3(#3)" : "AGPL-3.0";
+    lstr = lDebug ? "Affero-v3(#3)" : "AGPL-3.0-only";
   }
   else if (INFILE(_TITLE_GPL3)) {
-    lstr = lDebug ? "GPLv3(Affero#2)" : "GPL-3.0";
+    lstr = lDebug ? "GPLv3(Affero#2)" : "GPL-3.0-only";
   }
   else if (URL_INFILE(_URL_AGPL3)) {
-    lstr = lDebug ? "Affero-v3(url)" : "AGPL-3.0";
+    lstr = lDebug ? "Affero-v3(url)" : "AGPL-3.0-only";
   }
   else {
     lstr = "AGPL";
@@ -8000,36 +8142,36 @@ char *gfdlVersion(char *filetext, int size, int isML, int isPS)
     }
   }
   else if (INFILE(_TITLE_GFDL_V13_OR_LATER)) {
-    lstr = "GFDL-1.3+";
+    lstr = "GFDL-1.3-or-later";
   }
   else if (INFILE(_TITLE_GFDL_V13_ONLY)) {
     lstr = lDebug ? "GFDL-1.3(#1)" : "GFDL-1.3";
   }
   else if (INFILE(_TITLE_GFDL_V12_FULL_LICENSE)) {
-    lstr = lDebug ? "GFDL-1.2(#1)" : "GFDL-1.2";
+    lstr = lDebug ? "GFDL-1.2-only(#1)" : "GFDL-1.2-only";
   }
   else if (INFILE(_PHR_FSF_V12_OR_LATER) ||
       INFILE(_TITLE_GFDL_V12_OR_LATER)) {
-    lstr = "GFDL-1.2+";
+    lstr = "GFDL-1.2-or-later";
   }
   else if (INFILE(_TITLE_GFDL_V12_ONLY)) {
-    lstr = lDebug ? "GFDL-1.2(#1)" : "GFDL-1.2";
+    lstr = lDebug ? "GFDL-1.2-only(#1)" : "GFDL-1.2-only";
   }
   else if (INFILE(_TITLE_GFDL_V11_FULL_LICENSE)) {
-    lstr = lDebug ? "GFDL-1.1(#1)" : "GFDL-1.1";
+    lstr = lDebug ? "GFDL-1.1-only(#1)" : "GFDL-1.1-only";
   }
   else if (INFILE(_PHR_FSF_V11_OR_LATER) ||
       INFILE(_TITLE_GFDL_V11_OR_LATER)) {
-    lstr = "GFDL-1.1+";
+    lstr = "GFDL-1.1-or-later";
   }
   else if (INFILE(_TITLE_GFDL_V11_ONLY)) {
-    lstr = lDebug ? "GFDL-1.1(#1)" : "GFDL-1.1";
+    lstr = lDebug ? "GFDL-1.1-only(#1)" : "GFDL-1.1-only";
   }
   else if (INFILE(_PHR_FSF_V12_ONLY)) {
-    lstr = lDebug ? "GFDL-1.2(#2)" : "GFDL-1.2";
+    lstr = lDebug ? "GFDL-1.2-only(#2)" : "GFDL-1.2-only";
   }
   else if (INFILE(_PHR_FSF_V11_ONLY)) {
-    lstr = lDebug ? "GFDL-1.1(#2)" : "GFDL-1.1";
+    lstr = lDebug ? "GFDL-1.1-only(#2)" : "GFDL-1.1-only";
   }
   else {
     lstr = "GFDL";
@@ -8060,10 +8202,10 @@ char *lgplVersion(char *filetext, int size, int isML, int isPS)
       && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
   {
     if (INFILE(_TITLE_LGPL_KDE)) {
-      lstr = "LGPL-2.1+-KDE-exception";
+      lstr = "LGPL-2.1-or-later-KDE-exception";
     }
     else {
-      lstr = "LGPL-2.1+";
+      lstr = "LGPL-2.1-or-later";
     }
   }
   else if ((INFILE(_PHR_LGPL3_OR_LATER)
@@ -8074,10 +8216,10 @@ char *lgplVersion(char *filetext, int size, int isML, int isPS)
       || HASTEXT(_PHR_LGPL_30plus, REG_EXTENDED))
       && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
   {
-    lstr = "LGPL-3.0+";
+    lstr = "LGPL-3.0-or-later";
   }
   else if (INFILE(_LT_LGPL3ref) && NOT_INFILE(_PHR_NOT_UNDER_LGPL)) {
-    lstr = "LGPL-3.0";
+    lstr = "LGPL-3.0-only";
     lmem[_mLGPL] = 1;
   }
   else if (GPL_INFILE(_PHR_LGPL3_ONLY)
@@ -8085,7 +8227,7 @@ char *lgplVersion(char *filetext, int size, int isML, int isPS)
       || GPL_INFILE(_PHR_LGPL3_ONLY_ref1)
       || GPL_INFILE(_PHR_LGPL3_ONLY_ref2))
   {
-    lstr = "LGPL-3.0";
+    lstr = "LGPL-3.0-only";
   }
   else if (INFILE(_PHR_LGPL21_ONLY)
       || INFILE(_FILE_LGPLv21)
@@ -8095,50 +8237,50 @@ char *lgplVersion(char *filetext, int size, int isML, int isPS)
       || INFILE(_PHR_LGPL21_ONLY_ref3)
       || INFILE(_PHR_LGPL21_ONLY_ref4))
   {
-    lstr = "LGPL-2.1";
+    lstr = "LGPL-2.1-only";
   }
   else if ((INFILE(_PHR_LGPL2_OR_LATER)
       || HASTEXT(_PHR_LGPL2_OR_LATER_2, REG_EXTENDED)
       || HASTEXT(_PHR_LGPL2_OR_LATER_3, REG_EXTENDED))
       && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED))
   {
-    lstr = "LGPL-2.0+";
+    lstr = "LGPL-2.0-or-later";
   }
   else if (RM_INFILE(_PHR_LGPL2_ONLY) || RM_INFILE(_PHR_LGPL2_ONLY_ref1) || INFILE(_FILE_LGPLv2)) {
-    lstr = "LGPL-2.0";
+    lstr = "LGPL-2.0-only";
   }
   else if (INFILE(_PHR_LGPL1_OR_LATER) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-    lstr = "LGPL-1.0+";
+    lstr = "LGPL-1.0-or-later";
   }
   else if (INFILE(_PHR_LGPL1_ONLY) || INFILE(_PHR_FSF_V1_ONLY)) {
-    lstr = "LGPL-1.0";
+    lstr = "LGPL-1.0-only";
   }
   else if (URL_INFILE(_URL_CCLGPL_V21)) {
-    lstr = lDebug ? "CC-LGPL-2.1" : "LGPL-2.1";
+    lstr = lDebug ? "CC-LGPL-2.1" : "LGPL-2.1-only";
   }
   else if (INFILE(_LT_CC_GPL) || INFILE(_TITLE_CC_LGPL)) {
     lstr = "CC-LGPL";
   }
   else if (NY_INFILE(_TEXT_LGPLV3) && NOT_INFILE(_TEXT_LGPLV3_FOOTNOTE) &&
       HASREGEX(_TEXT_LGPLV3, filetext)) {
-    lstr = lDebug ? "LGPL-v3(#2)" : "LGPL-3.0";
+    lstr = lDebug ? "LGPL-v3(#2)" : "LGPL-3.0-only";
   }
   else if (INFILE(_TEXT_LGPLV21) &&
       HASREGEX(_TEXT_LGPLV21, filetext)) {
-    lstr = lDebug ? "LGPL-v2.1(#2)" : "LGPL-2.1";
+    lstr = lDebug ? "LGPL-v2.1(#2)" : "LGPL-2.1-only";
   }
   else if (INFILE(_TEXT_LGPLV2) &&
       HASREGEX(_TEXT_LGPLV2, filetext)) {
-    lstr = lDebug ? "LGPL-v2(#2)" : "LGPL-2.0";
+    lstr = lDebug ? "LGPL-v2(#2)" : "LGPL-2.0-only";
   }
   else if (INFILE(_SPDX_LGPL_20)) {
-    lstr = "LGPL-2.0";
+    lstr = "LGPL-2.0-only";
   }
   else if (INFILE(_SPDX_LGPL_21)) {
-    lstr = "LGPL-2.1";
+    lstr = "LGPL-2.1-only";
   }
   else if (INFILE(_SPDX_LGPL_30)) {
-    lstr = "LGPL-3.0";
+    lstr = "LGPL-3.0-only";
   }
   else {
     lstr = "LGPL";
@@ -8163,48 +8305,10 @@ char *gplVersion(char *filetext, int size, int isML, int isPS)
 #endif  /* PROC_TRACE */
   /* */
 
-  if (INFILE(_PHR_GPL21_OR_LATER) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-    lstr = "GPL-2.1+[sic]";
-  }
-  else if ((GPL_INFILE(_PHR_GPL3_ONLY)
-      || INFILE(_FILE_GPLv3)
-      || GPL_INFILE(_PHR_GPL3_ONLY_ref1)
-      || GPL_INFILE(_PHR_GPL3_ONLY_ref2))
-      && INFILE(_PHR_GPL2_OR_LATER_1))
-  {
-    lstr = "GPL-2.0+,GPL-3.0";
-  }
-  else if (HASTEXT(_LT_GPL_V2_NAMED_later, REG_EXTENDED) || INFILE(_TITLE_GPL2_ref1_later)) {
-    lstr = lDebug ? "GPLV2+(named)" : "GPL-2.0+";
-  }
-  else if (INFILE(_PHR_GPL2_OR_LATER_1)) {
-    if (INFILE(_TITLE_GPL_KDE)) {
-      lstr = "GPL-2.0+KDEupgradeClause";
-    }
-    else if (INFILE(_PHR_GPL2_ONLY_2) || INFILE(_PHR_GPL2_ONLY_3)) {
-      lstr = "GPL-2.0";
-    }
-    else if (GPL_INFILE(_PHR_GPL3_OR_LATER_ref2) || GPL_INFILE(_PHR_GPL3_OR_LATER_ref3)
-      || GPL_INFILE(_PHR_GPL3_OR_LATER) || GPL_INFILE(_PHR_GPL3_OR_LATER_ref1)) {
-      lstr = "GPL-2.0+,GPL-3.0+";
-    }
-    else if (!HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-      lstr = lDebug ? "PHR(GPL2_OR_LATER#3)" : "GPL-2.0+";
-    }
-    else if (INFILE(_TITLE_GPL2_ref1) || INFILE(_TITLE_GPL2_ref2)) {
-      lstr = lDebug ? "GPL-2.0(title)" : "GPL-2.0";
-    }
-  }
-  else if (INFILE(_PHR_GPL2_ONLY_4)) {
-    lstr = "GPL-2.0";
-  }
-  else if (INFILE(_PHR_GPL2_ONLY_5)) {
-    lstr = "GPL-2.0";
-  }
-  else if (GPL_INFILE(_PHR_GPL2_OR_GPL3)) {
-    lstr = "GPL-2.0,GPL-3.0";
-  }
-  else if (GPL_INFILE(_PHR_GPL3_OR_LATER_ref2)
+  /*
+   * GPL-3.0-only cases
+   */
+  if (GPL_INFILE(_PHR_GPL3_OR_LATER_ref2)
       || GPL_INFILE(_PHR_GPL3_OR_LATER_ref3)
       || GPL_INFILE(_PHR_GPL3_OR_LATER)
       || GPL_INFILE(_PHR_GPL3_OR_LATER_ref1)
@@ -8212,75 +8316,117 @@ char *gplVersion(char *filetext, int size, int isML, int isPS)
       || HASTEXT(_PHR_GPL_30plus, REG_EXTENDED))
   {
     if (!HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-      lstr = "GPL-3.0+";
+      lstr = "GPL-3.0-or-later";
+      if (INFILE(_PHR_GPL2_OR_LATER_1)) {
+        lstr = "GPL-2.0-or-later,GPL-3.0-or-later";
+      }
     }
   }
-  else if (GPL_INFILE(_PHR_FSF_V3_ONLY) || GPL_INFILE(_PHR_GPL3_ONLY) ||
-      INFILE(_FILE_GPLv3) || GPL_INFILE(_PHR_GPL3_ONLY_ref1) || GPL_INFILE(_PHR_GPL3_ONLY_ref2)) {
-    lstr = lDebug ? "GPL-v3(#2)" : "GPL-3.0";
+  else if (GPL_INFILE(_PHR_FSF_V3_ONLY)
+      || GPL_INFILE(_PHR_GPL3_ONLY)
+      || INFILE(_FILE_GPLv3)
+      || GPL_INFILE(_PHR_GPL3_ONLY_ref1)
+      || GPL_INFILE(_PHR_GPL3_ONLY_ref2)) {
+    lstr = lDebug ? "GPL-v3(#2)" : "GPL-3.0-only";
+    if (INFILE(_PHR_GPL2_OR_LATER_1))
+    {
+      lstr = "GPL-2.0-or-later,GPL-3.0-only";
+    }
   }
-  else if (INFILE(_PHR_FSF_V21_ONLY) || INFILE(_PHR_GPL21_ONLY)) {
-    lstr = lDebug ? "GPL-v2.1[sic]" : "GPL-2.1[sic]";
+  else if (NY_INFILE(_TEXT_GPLV3) && NOT_INFILE(_TEXT_GPLV3_FOOTNOTE) &&
+      HASREGEX(_TEXT_GPLV3, filetext)) {
+    lstr = lDebug ? "GPL-v3(#3)" : "GPL-3.0-only";
+  }
+  /*
+   * GPL-2.0-only cases
+   */
+  else if (HASTEXT(_LT_GPL_V2_NAMED_later, REG_EXTENDED) || INFILE(_TITLE_GPL2_ref1_later)) {
+    lstr = lDebug ? "GPLV2+(named)" : "GPL-2.0-or-later";
+  }
+  else if (HASTEXT(_SPDX_GPL_20_or_later, REG_EXTENDED)) {
+    lstr = lDebug ? "GPL-2.0-or-later(SPDX)" : "GPL-2.0-or-later";
+  }
+  else if (INFILE(_PHR_GPL2_OR_LATER_1)) {
+    if (INFILE(_TITLE_GPL_KDE)) {
+      lstr = "GPL-2.0-or-laterKDEupgradeClause";
+    }
+    else if (INFILE(_PHR_GPL2_ONLY_2) || INFILE(_PHR_GPL2_ONLY_3)) {
+      lstr = "GPL-2.0-only";
+    }
+    else if (!HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
+      lstr = lDebug ? "PHR(GPL2_OR_LATER#3)" : "GPL-2.0-or-later";
+    }
+    else if (INFILE(_TITLE_GPL2_ref1) || INFILE(_TITLE_GPL2_ref2)) {
+      lstr = lDebug ? "GPL-2.0-only(title)" : "GPL-2.0-only";
+    }
+  }
+  else if (HASTEXT(_SPDX_GPL_20, REG_EXTENDED)) {
+    lstr = lDebug ? "GPL-2.0-only(SPDX)" : "GPL-2.0-only";
+  }
+  else if (INFILE(_PHR_GPL2_ONLY_4)) {
+    lstr = "GPL-2.0-only";
+  }
+  else if (INFILE(_PHR_GPL2_ONLY_5)) {
+    lstr = "GPL-2.0-only";
+  }
+  else if (GPL_INFILE(_PHR_GPL2_OR_GPL3)) {
+    lstr = "GPL-2.0-only,GPL-3.0-only";
   }
   else if (INFILE(_PHR_FSF_V2_ONLY) || INFILE(_PHR_GPL2_ONLY) || INFILE(_PHR_GPL2_ONLY_1) ||
       INFILE(_FILE_GPLv2) || INFILE(_LT_GPL_V2_NAMED)) {
-    lstr = lDebug ? "GPL-v2(#2)" : "GPL-2.0";
+    lstr = lDebug ? "GPL-v2(#2)" : "GPL-2.0-only";
   }
+  else if (INFILE(_LT_GPL_V2_ref5)) {
+    lstr = lDebug ? "GPL-2.0-only(ref5)" : "GPL-2.0-only";
+  }
+  else if (NY_INFILE(_TEXT_GPLV2)) {
+    lstr = lDebug ? "GPL-v2(#3)" : "GPL-2.0-only";
+  }
+  /*
+   * GPL-1.0-only cases
+   */
   else if (GPL_INFILE(_PHR_FSF_V1_OR_LATER)
       || INFILE(_PHR_GPL1_OR_LATER)
       || HASTEXT(_SPDX_GPL_10plus, REG_EXTENDED)
       || HASTEXT(_PHR_GPL_10plus, REG_EXTENDED))
   {
     if (INFILE(_TITLE_GPL1)) {
-      lstr = lDebug ? "GPL-v1(#1)" : "GPL-1.0";
+      lstr = lDebug ? "GPL-v1(#1)" : "GPL-1.0-only";
     }
     else if (!HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-      lstr = "GPL-1.0+";
+      lstr = "GPL-1.0-or-later";
     }
   }
   else if (INFILE(_PHR_FSF_V1_ONLY) || INFILE(_PHR_GPL1_ONLY)) {
-    lstr = lDebug ? "GPL-v1(#2)" : "GPL-1.0";
+    lstr = lDebug ? "GPL-v1(#2)" : "GPL-1.0-only";
   }
   else if (URL_INFILE(_URL_CCGPL_V2)) {
-    lstr = "GPL-2.0";
-  }
-  else if (INFILE(_LT_GPL_V2_ref5)) {
-    lstr = lDebug ? "GPL-2.0(ref5)" : "GPL-2.0";
+    lstr = "GPL-2.0-only";
   }
   else if (INFILE(_LT_CC_GPL) || INFILE(_TITLE_CC_GPL)) {
     lstr = lDebug ? "GPL(CC_GPL)" : "GPL";
   }
-  else if (NY_INFILE(_TEXT_GPLV3) && NOT_INFILE(_TEXT_GPLV3_FOOTNOTE) &&
-      HASREGEX(_TEXT_GPLV3, filetext)) {
-    lstr = lDebug ? "GPL-v3(#3)" : "GPL-3.0";
-  }
-  else if (NY_INFILE(_TEXT_GPLV2)) {
-    lstr = lDebug ? "GPL-v2(#3)" : "GPL-2.0";
-  }
   else if (NY_INFILE(_TEXT_GPLV1) &&
       HASREGEX(_TEXT_GPLV1, filetext)) {
-    lstr = lDebug ? "GPL-v1(#3)" : "GPL-1.0";
+    lstr = lDebug ? "GPL-v1(#3)" : "GPL-1.0-only";
   }
   else if (HASTEXT(_SPDX_GPL_10, REG_EXTENDED)) {
-    lstr = lDebug ? "GPL-1.0(SPDX)" : "GPL-1.0";
-  }
-  else if (HASTEXT(_SPDX_GPL_20, REG_EXTENDED)) {
-    lstr = lDebug ? "GPL-2.0(SPDX)" : "GPL-2.0";
+    lstr = lDebug ? "GPL-1.0-only(SPDX)" : "GPL-1.0-only";
   }
   else if (HASTEXT(_SPDX_GPL_30, REG_EXTENDED)) {
-    lstr = lDebug ? "GPL-3.0(SPDX)" : "GPL-3.0";
+    lstr = lDebug ? "GPL-3.0-only(SPDX)" : "GPL-3.0-only";
   }
   /* special case for Debian copyright files
      Moved from the beginning here under else if ... is this anymore needed
    */
   else if (INFILE(_TEXT_GPLV3_CR) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
-    lstr = "GPL-3.0";
+    lstr = "GPL-3.0-only";
   }
   else if (INFILE(_FILE_GPL1) || INFILE(_FILE_GPL2)) {
     lstr = lDebug ? "GPL(deb)" : "GPL";
   }
   /*
-   * MODULE("GPL") cannot be unambiguously interpreted as GPL-2.0
+   * MODULE("GPL") cannot be unambiguously interpreted as GPL-2.0-only
    * license. Same statement is used also outside Linux kernel.
    * Furthermore, many of the files which have this MODULE statement,
    * have explicit GPL license statement. Therefore this is changed
@@ -8288,6 +8434,15 @@ char *gplVersion(char *filetext, int size, int isML, int isPS)
    */
   else if (INFILE(_TITLE_MODULE_LICENSE_GPL)) {
     lstr = lDebug ? "GPL(linux-kernel)" : "GPL";
+  }
+  /*
+   * Finally let's see if there is a type error in license version
+   */
+  else if (INFILE(_PHR_GPL21_OR_LATER) && !HASTEXT(_LT_IGNORE_CLAUSE, REG_EXTENDED)) {
+    lstr = "GPL-2.1+[sic]";
+  }
+  else if (INFILE(_PHR_FSF_V21_ONLY) || INFILE(_PHR_GPL21_ONLY)) {
+    lstr = lDebug ? "GPL-v2.1[sic]" : "GPL-2.1[sic]";
   }
   /*
    * Special case, HACK: "Debian packaging ... licensed under GPL"
@@ -8306,7 +8461,7 @@ char *gplVersion(char *filetext, int size, int isML, int isPS)
     }
     kludge.base = NULL_STR;
   }
-  if (lstr == NULL_STR && NOT_INFILE(_PHR_JYTHON_NOTGPL) && !HASTEXT(_TITLE_QT_GPL_EXCEPTION_10, 0)) {
+  if (lstr == NULL_STR && NOT_INFILE(_PHR_JYTHON_NOTGPL) && !HASTEXT(_TITLE_QT_GPL_EXCEPTION_10, 0) && !HASTEXT(_LT_OPENBSD_GPL_EXCEPTION, 0)) {
     lstr = lDebug ? "GPL(NULL)" : "GPL";
   }
   return lstr;
@@ -8487,8 +8642,9 @@ char *ccVersion(char *filetext, int size, int isML, int isPS)
   else if (URL_INFILE(_URL_CC0)) {
     lstr = lDebug ? "CC0(URL)" : "CC0-1.0";
   }
-  else if (URL_INFILE(_URL_CC_PD)) {
-    lstr = lDebug ? "CC(PD)" : "Public-domain";
+  else if (URL_INFILE(_URL_CC_PDDC)) {
+    lstr = lDebug ? "CC(PD)" : "CC-PDDC";
+    pd = 1;
   }
   else if (INFILE(_TITLE_CCPL)) {
     INTERESTING("CCPL");
@@ -9747,7 +9903,7 @@ void checkFileReferences(char *filetext, int size, int score, int kwbm,
   if(HASTEXT(_LT_SEE_COPYING_LICENSE_1, REG_EXTENDED) || HASTEXT(_LT_SEE_COPYING_LICENSE_2, REG_EXTENDED)) {
     INTERESTING("See-file");
   }
-  else if (HASTEXT(_LT_SEE_URL, REG_EXTENDED) || HASTEXT(_LT_SEE_URL_ref1, REG_EXTENDED)) {
+  else if (HASTEXT(_LT_SEE_URL, REG_EXTENDED) || HASTEXT(_LT_SEE_URL_ref1, REG_EXTENDED) || HASTEXT(_LT_SEE_URL_ref2, REG_EXTENDED) || HASTEXT(_LT_SEE_URL_ref3, REG_EXTENDED)) {
     INTERESTING("See-URL");
   }
   return;
@@ -9929,7 +10085,7 @@ int checkPublicDomain(char *filetext, int size, int score, int kwbm,
   }
   ret = 0;        /* default answer is "no" */
   if (INFILE(_LT_PUBDOM_CC)) {
-    INTERESTING(lDebug ? "Pubdom(CC)" : LS_PD_CLM);
+    INTERESTING(lDebug ? "Pubdom(CC)" : "CC-PDDC");
     ret = 1;
   } else if (INFILE(_LT_PUBDOM_ODC)) {
     INTERESTING(lDebug ? "Pubdom(ODC)" : LS_PD_CLM);
@@ -9986,7 +10142,12 @@ int checkPublicDomain(char *filetext, int size, int score, int kwbm,
     INTERESTING(lDebug ? "Pubdom(9)" : LS_PD_CLM);
     ret = 1;
   } else if (INFILE(_LT_PUBDOM_10)) {
-    INTERESTING(lDebug ? "Pubdom(10)" : LS_PD_CLM);
+      if (INFILE(_LT_blessing)) {
+        INTERESTING(lDebug ? "Pubdom(10)" : "blessing");
+      }
+      else {
+        INTERESTING(lDebug ? "Pubdom(10)" : LS_PD_CLM);
+      }
     ret = 1;
   } else if (INFILE(_URL_PUBDOM)) {
     INTERESTING(lDebug ? "Pubdom(URL)" : LS_PD_CLM);
@@ -10391,6 +10552,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   else if (INFILE(_SPDX_BitTorrent_11)) {
     INTERESTING("BitTorrent-1.1");
   }
+  if (INFILE(_SPDX_blessing)) {
+    INTERESTING("blessing");
+  }
+  if (INFILE(_SPDX_BlueOak_100)) {
+    INTERESTING("BlueOak-1.0.0");
+  }
   if (INFILE(_SPDX_BSL_10)) {
     INTERESTING("BSL-1.0");
   }
@@ -10409,6 +10576,24 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_Caldera)) {
     INTERESTING("Caldera");
   }
+  if (INFILE(_SPDX_CC_PDDC)) {
+    INTERESTING("CC-PDDC");
+  }
+  if (INFILE(_SPDX_CERN_OHL_P_20)) {
+    INTERESTING("CERN-OHL-P-2.0");
+  }
+  else if (INFILE(_SPDX_CERN_OHL_S_20)) {
+    INTERESTING("CERN-OHL-S-2.0");
+  }
+  else if (INFILE(_SPDX_CERN_OHL_W_20)) {
+    INTERESTING("CERN-OHL-W-2.0");
+  }
+  else if (INFILE(_SPDX_CERN_OHL_12)) {
+    INTERESTING("CERN-OHL-1.2");
+  }
+  else if (INFILE(_SPDX_CERN_OHL_11)) {
+    INTERESTING("CERN-OHL-1.1");
+  }
   if (INFILE(_SPDX_ClArtistic)) {
     INTERESTING("ClArtistic");
   }
@@ -10424,6 +10609,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_CPL_10)) {
     INTERESTING("CPL-1.0");
   }
+  if (INFILE(_SPDX_CAL_10_Combined_Work_Exception)) {
+    INTERESTING("CAL-1.0-Combined-Work-Exception");
+  }
+  else if (INFILE(_SPDX_CAL_10)) {
+    INTERESTING("CAL-1.0");
+  }
   if (INFILE(_SPDX_CATOSL_11)) {
     INTERESTING("CATOSL-1.1");
   }
@@ -10438,6 +10629,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   else if (INFILE(_SPDX_CC_BY_25)) {
     INTERESTING("CC-BY-2.5");
+  }
+  else if (INFILE(_SPDX_CC_BY_30_AT)) {
+    INTERESTING("CC-BY-3.0-AT");
   }
   else if (INFILE(_SPDX_CC_BY_30)) {
     INTERESTING("CC-BY-3.0");
@@ -10484,6 +10678,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   else if (INFILE(_SPDX_CC_BY_NC_ND_25)) {
     INTERESTING("CC-BY-NC-ND-2.5");
   }
+  else if (INFILE(_SPDX_CC_BY_NC_ND_30_IGO)) {
+    INTERESTING("CC-BY-NC-ND-3.0-IGO");
+  }
   else if (INFILE(_SPDX_CC_BY_NC_ND_30)) {
     INTERESTING("CC-BY-NC-ND-3.0");
   }
@@ -10513,6 +10710,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   else if (INFILE(_SPDX_CC_BY_SA_25)) {
     INTERESTING("CC-BY-SA-2.5");
+  }
+  else if (INFILE(_SPDX_CC_BY_SA_30_AT)) {
+    INTERESTING("CC-BY-SA-3.0-AT");
   }
   else if (INFILE(_SPDX_CC_BY_SA_30)) {
     INTERESTING("CC-BY-SA-3.0");
@@ -10586,8 +10786,14 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_Entessa)) {
     INTERESTING("Entessa");
   }
+  if (INFILE(_SPDX_EPICS)) {
+    INTERESTING("EPICS");
+  }
   if (INFILE(_SPDX_ErlPL_11)) {
     INTERESTING("ErlPL-1.1");
+  }
+  if (INFILE(_SPDX_etalab_20)) {
+    INTERESTING("etalab-2.0");
   }
   if (INFILE(_SPDX_EUDatagrid)) {
     INTERESTING("EUDatagrid");
@@ -10631,32 +10837,71 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_Glulxe)) {
     INTERESTING("Glulxe");
   }
-  if (INFILE(_SPDX_GFDL_11_or_later)
+  if (INFILE(_SPDX_GFDL_11_invariants_or_later)) {
+    INTERESTING("GFDL-1.1-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_11_no_invariants_or_later)) {
+    INTERESTING("GFDL-1.1-no-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_11_invariants_only)) {
+    INTERESTING("GFDL-1.1-invariants-only");
+  }
+  else if (INFILE(_SPDX_GFDL_11_no_invariants_only)) {
+    INTERESTING("GFDL-1.1-no-invariants-only");
+  }
+  else if (INFILE(_SPDX_GFDL_11_or_later)
       || HASTEXT(_SPDX_GFDL_11plus, REG_EXTENDED)
       || HASTEXT(_PHR_GFDL_11plus, REG_EXTENDED))
   {
-    INTERESTING("GFDL-1.1+");
+    INTERESTING("GFDL-1.1-or-later");
   }
   else if (INFILE(_SPDX_GFDL_11)) {
-    INTERESTING("GFDL-1.1");
+    INTERESTING("GFDL-1.1-only");
+  }
+  else if (INFILE(_SPDX_GFDL_12_invariants_or_later)) {
+    INTERESTING("GFDL-1.2-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_12_no_invariants_or_later)) {
+    INTERESTING("GFDL-1.2-no-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_12_invariants_only)) {
+    INTERESTING("GFDL-1.2-invariants-only");
+  }
+  else if (INFILE(_SPDX_GFDL_12_no_invariants_only)) {
+    INTERESTING("GFDL-1.2-no-invariants-only");
   }
   else if (INFILE(_SPDX_GFDL_12_or_later)
       || HASTEXT(_SPDX_GFDL_12plus, REG_EXTENDED)
       || HASTEXT(_PHR_GFDL_12plus, REG_EXTENDED))
   {
-    INTERESTING("GFDL-1.2+");
+    INTERESTING("GFDL-1.2-or-later");
   }
   else if (INFILE(_SPDX_GFDL_12)) {
-    INTERESTING("GFDL-1.2");
+    INTERESTING("GFDL-1.2-only");
+  }
+  else if (INFILE(_SPDX_GFDL_13_invariants_or_later)) {
+    INTERESTING("GFDL-1.3-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_13_no_invariants_or_later)) {
+    INTERESTING("GFDL-1.3-no-invariants-or-later");
+  }
+  else if (INFILE(_SPDX_GFDL_13_invariants_only)) {
+    INTERESTING("GFDL-1.3-invariants-only");
+  }
+  else if (INFILE(_SPDX_GFDL_13_no_invariants_only)) {
+    INTERESTING("GFDL-1.3-no-invariants-only");
   }
   else if (INFILE(_SPDX_GFDL_13_or_later)
       || HASTEXT(_SPDX_GFDL_13plus, REG_EXTENDED)
       || HASTEXT(_PHR_GFDL_13plus, REG_EXTENDED))
   {
-    INTERESTING("GFDL-1.3+");
+    INTERESTING("GFDL-1.3-or-later");
   }
   else if (INFILE(_SPDX_GFDL_13)) {
     INTERESTING("GFDL-1.3");
+  }
+  if (INFILE(_SPDX_GLWTPL)) {
+    INTERESTING("GLWTPL");
   }
   if (INFILE(_SPDX_gnuplot)) {
     INTERESTING("gnuplot");
@@ -10667,7 +10912,13 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_HaskellReport)) {
     INTERESTING("HaskellReport");
   }
-  if (INFILE(_SPDX_HPND)) {
+  if (INFILE(_SPDX_Hippocratic_21)) {
+    INTERESTING("Hippocratic-2.1");
+  }
+  if (INFILE(_SPDX_HPND_sell_variant)) {
+    INTERESTING("HPND-sell-variant");
+  }
+  else if (INFILE(_SPDX_HPND)) {
     INTERESTING("HPND");
   }
   if (INFILE(_SPDX_IBM_pibs)) {
@@ -10703,6 +10954,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_JasPer_20)) {
     INTERESTING("JasPer-2.0");
   }
+  if (INFILE(_SPDX_JPNIC)) {
+    INTERESTING("JPNIC");
+  }
   if (INFILE(_SPDX_JSON)) {
     INTERESTING("JSON");
   }
@@ -10715,8 +10969,14 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_LGPLLR)) {
     INTERESTING("LGPLLR");
   }
-  if (INFILE(_SPDX_Libpng)) {
+  if (INFILE(_SPDX_libpng_20)) {
+    INTERESTING("libpng-2.0");
+  }
+  else if (INFILE(_SPDX_Libpng)) {
     INTERESTING("Libpng");
+  }
+  if (INFILE(_SPDX_libselinux_10)) {
+    INTERESTING("libselinux-1.0");
   }
   if (INFILE(_SPDX_libtiff)) {
     INTERESTING("libtiff");
@@ -10784,6 +11044,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_mpich2)) {
     INTERESTING("mpich2");
   }
+  if (INFILE(_SPDX_MulanPSL_20)) {
+    INTERESTING("MulanPSL-2.0");
+  }
+  else if (INFILE(_SPDX_MulanPSL_10)) {
+    INTERESTING("MulanPSL-1.0");
+  }
   if (INFILE(_SPDX_Multics)) {
     INTERESTING("Multics");
   }
@@ -10799,6 +11065,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_NBPL_10)) {
     INTERESTING("NBPL-1.0");
   }
+  if (INFILE(_SPDX_NCGL_UK_20)) {
+    INTERESTING("NCGL-UK-2.0");
+  }
   if (INFILE(_SPDX_Net_SNMP)) {
     INTERESTING("Net-SNMP");
   }
@@ -10807,6 +11076,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   if (INFILE(_SPDX_NGPL)) {
     INTERESTING("NGPL");
+  }
+  if (INFILE(_SPDX_NIST_PD_fallback)) {
+    INTERESTING("NIST-PD-fallback");
+  }
+  else if (INFILE(_SPDX_NIST_PD)) {
+    INTERESTING("NIST-PD");
   }
   if (INFILE(_SPDX_NOSL)) {
     INTERESTING("NOSL");
@@ -10838,17 +11113,26 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_NRL)) {
     INTERESTING("NRL");
   }
-  if (INFILE(_SPDX_NTP)) {
+  if (INFILE(_SPDX_NTP_0)) {
+    INTERESTING("NTP-0");
+  }
+  else if (INFILE(_SPDX_NTP)) {
     INTERESTING("NTP");
   }
   if (INFILE(_SPDX_Nunit)) {
     INTERESTING("Nunit");
+  }
+  if (INFILE(_SPDX_O_UDA_10)) {
+    INTERESTING("O-UDA-1.0");
   }
   if (INFILE(_SPDX_OCLC_20)) {
     INTERESTING("OCLC-2.0");
   }
   if (INFILE(_SPDX_ODbL_10)) {
     INTERESTING("ODbL-1.0");
+  }
+  if (INFILE(_SPDX_OGC_10)) {
+    INTERESTING("OGC-1.0");
   }
   if (INFILE(_SPDX_PDDL_10)) {
     INTERESTING("PDDL-1.0");
@@ -10858,6 +11142,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   if (INFILE(_SPDX_ODC_By_10)) {
     INTERESTING("ODC-By-1.0");
+  }
+  if (INFILE(_SPDX_OGL_Canada_20)) {
+    INTERESTING("OGL-Canada-2.0");
   }
   if (INFILE(_SPDX_OGL_UK_10)) {
     INTERESTING("OGL-UK-1.0");
@@ -10943,6 +11230,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_OSET_PL_21)) {
     INTERESTING("OSET-PL-2.1");
   }
+  if (INFILE(_SPDX_Parity_700)) {
+    INTERESTING("Parity-7.0.0");
+  }
+  else if (INFILE(_SPDX_Parity_600)) {
+    INTERESTING("Parity-6.0.0");
+  }
   if (INFILE(_SPDX_PHP_301)) {
     INTERESTING("PHP-3.01");
   }
@@ -10952,8 +11245,17 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_Plexus)) {
     INTERESTING("Plexus");
   }
+  if (INFILE(_SPDX_PolyForm_Noncommercial_100)) {
+    INTERESTING("PolyForm-Noncommercial-1.0.0");
+  }
+  else if (INFILE(_SPDX_PolyForm_Small_Business_100)) {
+    INTERESTING("PolyForm-Small-Business-1.0.0");
+  }
   if (INFILE(_SPDX_PostgreSQL)) {
     INTERESTING("PostgreSQL");
+  }
+  if (INFILE(_SPDX_PSF_20)) {
+    INTERESTING("PSF-2.0");
   }
   if (INFILE(_SPDX_psfrag)) {
     INTERESTING("psfrag");
@@ -11000,6 +11302,12 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_Saxpath)) {
     INTERESTING("Saxpath");
   }
+  if (INFILE(_SPDX_SHL_051)) {
+    INTERESTING("SHL-0.51");
+  }
+  else if (INFILE(_SPDX_SHL_05)) {
+    INTERESTING("SHL-0.5");
+  }
   if (INFILE(_SPDX_SCEA)) {
     INTERESTING("SCEA");
   }
@@ -11024,12 +11332,6 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_SGI_B_20)) {
     INTERESTING("SGI-B-2.0");
   }
-  if (INFILE(_SPDX_OFL_10)) {
-    INTERESTING("OFL-1.0");
-  }
-  if (INFILE(_SPDX_OFL_11)) {
-    INTERESTING("OFL-1.1");
-  }
   if (INFILE(_SPDX_SimPL_20)) {
     INTERESTING("SimPL-2.0");
   }
@@ -11051,6 +11353,15 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   if (INFILE(_SPDX_SMLNJ)) {
     INTERESTING("SMLNJ");
   }
+  if (INFILE(_SPDX_SSH_OpenSSH)) {
+    INTERESTING("SSH-OpenSSH");
+  }
+  if (INFILE(_SPDX_SSH_short)) {
+    INTERESTING("SSH-short");
+  }
+  if (INFILE(_SPDX_SSPL_10)) {
+    INTERESTING("SSPL-1.0");
+  }
   if (INFILE(_SPDX_SugarCRM_113)) {
     INTERESTING("SugarCRM-1.1.3");
   }
@@ -11065,6 +11376,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   if (INFILE(_SPDX_Watcom_10)) {
     INTERESTING("Watcom-1.0");
+  }
+  if (INFILE(_SPDX_TAPR_OHL_10)) {
+    INTERESTING("TAPR-OHL-1.0");
   }
   if (INFILE(_SPDX_TCP_wrappers)) {
     INTERESTING("TCP-wrappers");
@@ -11086,6 +11400,9 @@ void spdxReference(char *filetext, int size, int isML, int isPS)
   }
   else if (INFILE(_SPDX_TU_Berlin_20)) {
     INTERESTING("TU-Berlin-2.0");
+  }
+  if (INFILE(_SPDX_UCL_10)) {
+    INTERESTING("UCL-1.0");
   }
   if (INFILE(_SPDX_Unicode_DFS_2015)) {
     INTERESTING("Unicode-DFS-2015");
@@ -11272,6 +11589,9 @@ void copyleftExceptions(char *filetext, int size, int isML, int isPS)
   else if (INFILE(_LT_GPL_EXCEPT_5) && INFILE(_LT_Autoconf_exception_30)) {
     INTERESTING("Autoconf-exception-3.0");
   }
+  else if (INFILE(_PHR_Autoconf_exception_30)) {
+    INTERESTING("Autoconf-exception-3.0");
+  }
   else if (INFILE(_LT_Autoconf_exception_3)) {
     INTERESTING("Autoconf-exception");
   }
@@ -11390,12 +11710,12 @@ void copyleftExceptions(char *filetext, int size, int isML, int isPS)
     INTERESTING("WxWindows-exception-3.1");
   }
   /*
-   * Full license text includes reference to LGPL-2.0
+   * Full license text includes reference to LGPL-2.0-only
    * exception clause.
    */
   else if (INFILE(_PHR_WXWINDOWS_31)) {
     INTERESTING("WxWindows-exception-3.1");
-    INTERESTING("LGPL-2.0+");
+    INTERESTING("LGPL-2.0-or-later");
   }
   /*
    * This is a vague reference to WxWindows license without

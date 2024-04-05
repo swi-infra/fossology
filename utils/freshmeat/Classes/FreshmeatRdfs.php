@@ -1,22 +1,9 @@
 <?php
+/*
+ SPDX-FileCopyrightText: © 2008 Hewlett-Packard Development Company, L.P.
 
-
-/***********************************************************
- Copyright (C) 2008 Hewlett-Packard Development Company, L.P.
-
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * Class to deal with freshmeat rdfs.
@@ -120,7 +107,7 @@ class FreshmeatRdfs
   *
   * The input file is expected to be in the FreashMeat rdf format.
   *
-  * @param string $xml_file path to xml file in FM rdf format
+  * @param string $rdf_file path to xml file in FM rdf format
   *
   * @return array of projects (see internal notes)
   *
@@ -166,9 +153,7 @@ class FreshmeatRdfs
       );
       foreach ($project->latest_release as $verdata)
       {
-        array_push(& $this->project_info["$project->projectname_short"],
-        $verdata->latest_release_version
-                   );
+        $this->project_info["$project->projectname_short"][] = $verdata->latest_release_version;
       }
     }
     ksort($this->project_info);
@@ -185,4 +170,3 @@ class FreshmeatRdfs
     }
   }
 }
-?>
