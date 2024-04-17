@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
-Author: Steffen Weber
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ Author: Steffen Weber
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
@@ -24,6 +13,8 @@ use Fossology\Lib\Data\AgentRef;
 use Fossology\Lib\Data\LicenseMatch;
 use Fossology\Lib\Data\LicenseRef;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
+use Fossology\Lib\Db\DbManager;
+use Fossology\Lib\Test\TestLiteDb;
 use Fossology\Lib\Test\TestPgDb;
 
 class LicenseDaoTest extends \PHPUnit\Framework\TestCase
@@ -33,22 +24,33 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
   /** @var DbManager */
   private $dbManager;
 
-  protected function setUp()
+  protected function setUp() : void
   {
     $this->testDb = new TestPgDb();
     $this->dbManager = $this->testDb->getDbManager();
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
   }
 
-  protected function tearDown()
+  protected function tearDown() : void
   {
     $this->testDb = null;
     $this->dbManager = null;
   }
 
+  /**
+   * Setup license_ref table and rf_pk sequence
+   */
+  private function setUpLicenseRefTable()
+  {
+    $this->testDb->createPlainTables(array('license_ref'));
+    $this->testDb->createSequences(array('license_ref_rf_pk_seq'));
+    $this->testDb->alterTables(array('license_ref'));
+  }
+
   public function testGetFileLicenseMatches()
   {
-    $this->testDb->createPlainTables(array('license_ref','uploadtree','license_file','agent'));
+    $this->testDb->createPlainTables(array('uploadtree','license_file','agent'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref();
 
     $lic0 = $this->dbManager->getSingleRow("Select * from license_ref limit 1");
@@ -77,7 +79,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
     $itemTreeBounds = new ItemTreeBounds($uploadtreeId,"uploadtree",$uploadID,$left,$right);
     $matches = $licDao->getAgentFileLicenseMatches($itemTreeBounds);
 
-    $licenseRef = new LicenseRef($licenseRefNumber, $lic0['rf_shortname'], $lic0['rf_fullname']);
+    $licenseRef = new LicenseRef($licenseRefNumber, $lic0['rf_shortname'], $lic0['rf_fullname'], $lic0['rf_spdx_id']);
     $agentRef = new AgentRef($agentId, $agentName, $agentRev);
     $expected = array( new LicenseMatch($pfileId, $licenseRef, $agentRef, $licenseFileId, $matchPercent) );
 
@@ -89,7 +91,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicenseByShortName()
   {
-    $this->testDb->createPlainTables(array('license_ref'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref($limit=3);
     $licDao = new LicenseDao($this->dbManager);
     $lic0 = $this->dbManager->getSingleRow("Select rf_shortname from license_ref limit 1");
@@ -105,7 +107,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicenseId()
   {
-    $this->testDb->createPlainTables(array('license_ref'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref($limit=3);
     $licDao = new LicenseDao($this->dbManager);
     $lic0 = $this->dbManager->getSingleRow("Select rf_pk from license_ref limit 1");
@@ -121,7 +123,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicenseRefs()
   {
-    $this->testDb->createPlainTables(array('license_ref'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref();
     $licDao = new LicenseDao($this->dbManager);
     $licAll = $licDao->getLicenseRefs();
@@ -132,7 +134,8 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicenseShortnamesContained()
   {
-    $this->testDb->createPlainTables(array('license_ref','license_file','uploadtree'));
+    $this->testDb->createPlainTables(array('license_file','uploadtree'));
+    $this->setUpLicenseRefTable();
     $this->dbManager->queryOnce("CREATE TABLE \"uploadtree_a\" AS SELECT * FROM uploadtree");
     $this->testDb->createViews(array('license_file_ref'));
     $this->testDb->insertData(array('license_file','uploadtree_a'));
@@ -178,7 +181,8 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicenseIdPerPfileForAgentId()
   {
-    $this->testDb->createPlainTables(array('license_ref','license_file','uploadtree','agent'));
+    $this->testDb->createPlainTables(array('license_file','uploadtree','agent'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData(array('agent'));
     $this->testDb->createViews(array('license_file_ref'));
     $this->testDb->insertData_license_ref($limit=3);
@@ -225,7 +229,8 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetLicensesPerFileNameForAgentId()
   {
-    $this->testDb->createPlainTables(array('license_ref','license_file','uploadtree','agent'));
+    $this->testDb->createPlainTables(array('license_file','uploadtree','agent'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData(array('agent'));
     $this->testDb->createViews(array('license_file_ref'));
     $this->testDb->insertData_license_ref($limit=3);
@@ -357,7 +362,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
   public function testIsNewLicense()
   {
     $groupId = 401;
-    $this->testDb->createPlainTables(array('license_ref'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref();
     $this->dbManager->queryOnce("CREATE TABLE license_candidate AS SELECT *,$groupId group_fk FROM license_ref LIMIT 1");
     $licCandi = $this->dbManager->getSingleRow("SELECT * FROM license_candidate",array(),__METHOD__.'.candi');
@@ -385,7 +390,8 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
 
   public function testGetAgentFileLicenseMatchesWithLicenseMapping()
   {
-    $this->testDb->createPlainTables(array('license_ref','uploadtree','license_file','agent','license_map'));
+    $this->testDb->createPlainTables(array('uploadtree','license_file','agent','license_map'));
+    $this->setUpLicenseRefTable();
     $this->testDb->insertData_license_ref();
 
     $lic0 = $this->dbManager->getSingleRow("Select * from license_ref limit 1",array(),__METHOD__.'.anyLicense');
@@ -416,7 +422,7 @@ class LicenseDaoTest extends \PHPUnit\Framework\TestCase
     $itemTreeBounds = new ItemTreeBounds($uploadtreeId,"uploadtree",$uploadID,$left,$right);
     $matches = $licDao->getAgentFileLicenseMatches($itemTreeBounds,LicenseMap::CONCLUSION);
 
-    $licenseRef = new LicenseRef($licRefId, $lic0['rf_shortname'], $lic0['rf_fullname']);
+    $licenseRef = new LicenseRef($licRefId, $lic0['rf_shortname'], $lic0['rf_fullname'], $lic0['rf_spdx_id']);
     $agentRef = new AgentRef($agentId, $agentName, $agentRev);
     $expected = array( new LicenseMatch($pfileId, $licenseRef, $agentRef, $licenseFileId, $matchPercent) );
 

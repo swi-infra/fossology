@@ -1,22 +1,13 @@
 <?php
 /*
- * Copyright (C) 2016, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2016 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\SpdxTwo;
+
+use Fossology\Lib\Data\LicenseRef;
 
 /**
  * @class SpdxTwoUtils
@@ -24,14 +15,12 @@ namespace Fossology\SpdxTwo;
  */
 class SpdxTwoUtils
 {
-  static public $prefix = "LicenseRef-";      ///< Prefix to be used
-
   /**
    * @brief For a given set of arguments assign $args[$key1] and $args[$key2]
    *
    * Get the array of arguments and find $key1 and $key2 values and assign
    * to $args[$key1] and $args[$key2].
-   * @param string $args String array
+   * @param string[] $args String array
    * @param string $key1 Key1
    * @param string $key2 Key2
    * @return string[] $args
@@ -52,10 +41,9 @@ class SpdxTwoUtils
   /**
    * @brief Add prefix to the license based on SPDX2 standards
    * @param string $license
-   * @param callable $spdxValidityChecker
    * @return string
    */
-  static public function addPrefixOnDemand($license, $spdxValidityChecker = null)
+  static public function addPrefixOnDemand($license)
   {
     if (empty($license) || $license === "NOASSERTION") {
       return "NOASSERTION";
@@ -65,30 +53,24 @@ class SpdxTwoUtils
       return "(" . $license . ")";
     }
 
-    if ($spdxValidityChecker === null ||
-        (is_callable($spdxValidityChecker) &&
-            call_user_func($spdxValidityChecker, $license))) {
-      return $license;
-    }
-
-    // if we get here, we're using a non-standard SPDX license
-    // make sure our license text conforms to the SPDX specifications
     $license = preg_replace('/[^a-zA-Z0-9\-\_\.\+]/','-',$license);
-    $license = preg_replace('/\+(?!$)/','-',$license);
-    return self::$prefix . $license;
+    if (strpos($license, LicenseRef::SPDXREF_PREFIX) !== false) {
+      // License ref can not end with a '+'
+      $license = preg_replace('/\+$/', '-or-later', $license);
+    }
+    return preg_replace('/\+(?!$)/','-',$license);
   }
 
   /**
    * @brief Add prefix to license keys
    * @param array $licenses
-   * @param callable $spdxValidityChecker
    * @return string[]
    */
-  static public function addPrefixOnDemandKeys($licenses, $spdxValidityChecker = null)
+  static public function addPrefixOnDemandKeys($licenses)
   {
     $ret = array();
     foreach ($licenses as $license=>$text) {
-      $ret[self::addPrefixOnDemand($license, $spdxValidityChecker)] = $text;
+      $ret[self::addPrefixOnDemand($license)] = $text;
     }
     return $ret;
   }
@@ -96,41 +78,81 @@ class SpdxTwoUtils
   /**
    * @brief Add prefix to license list
    * @param array $licenses
-   * @param callable $spdxValidityChecker
    * @return array
    */
-  static public function addPrefixOnDemandList($licenses, $spdxValidityChecker = null)
+  static public function addPrefixOnDemandList($licenses)
   {
-    return array_map(function ($license) use ($spdxValidityChecker)
+    return array_map(function ($license)
     {
-      return SpdxTwoUtils::addPrefixOnDemand($license, $spdxValidityChecker);
+      return SpdxTwoUtils::addPrefixOnDemand($license);
     },$licenses);
   }
 
   /**
    * @brief Implode licenses with "AND" or "OR"
-   * @param string $licenses
-   * @param callable $spdxValidityChecker
+   * @param string[] $licenses
    * @return string
    */
-  static public function implodeLicenses($licenses, $spdxValidityChecker = null)
+  static public function implodeLicenses($licenses)
   {
     if (!$licenses || !is_array($licenses) || sizeof($licenses) == 0) {
       return "";
     }
 
-    $licenses = self::addPrefixOnDemandList($licenses, $spdxValidityChecker);
+    $licenses = self::addPrefixOnDemandList($licenses);
     sort($licenses, SORT_NATURAL | SORT_FLAG_CASE);
 
     if (count($licenses) == 3 &&
        ($index = array_search("Dual-license",$licenses)) !== false) {
       return $licenses[$index===0?1:0] . " OR " . $licenses[$index===2?1:2];
     } elseif (count($licenses) == 3 &&
-        ($index = array_search(self::$prefix . "Dual-license",$licenses)) !== false) {
+        ($index = array_search(LicenseRef::SPDXREF_PREFIX . "Dual-license", $licenses)) !== false) {
       return $licenses[$index===0?1:0] . " OR " . $licenses[$index===2?1:2];
     } else {
-      // Add prefixes where needed, enclose statments containing ' OR ' with parantheses
+      // Add prefixes where needed, enclose statements containing ' OR ' with parentheses
       return implode(" AND ", $licenses);
     }
+  }
+
+  /**
+   * Clean an array of strings by trimming the elements and removing empty
+   * strings.
+   * @param string[] $texts Array of texts to be concatenated.
+   * @return string[] String array with all trimmed string elements.
+   */
+  static public function cleanTextArray($texts): array
+  {
+    if (!$texts || !is_array($texts) || sizeof($texts) == 0) {
+      return [];
+    }
+
+    sort($texts, SORT_NATURAL | SORT_FLAG_CASE);
+
+    $cleanArray = [];
+    foreach ($texts as $text) {
+      $text = trim($text);
+      if (empty($text)) {
+        continue;
+      }
+      $cleanArray[] = $text;
+    }
+    return $cleanArray;
+  }
+
+  /**
+   * Remove empty and 'NOASSERTION' licenses from list.
+   * @param string[] $licenses List of licenses.
+   * @return array List of licenses removing empty and 'NOASSERTION's.
+   */
+  public static function removeEmptyLicenses($licenses): array
+  {
+    $newList = [];
+    foreach ($licenses as $license) {
+      if (empty($license) || $license === "NOASSERTION") {
+        continue;
+      }
+      $newList[] = $license;
+    }
+    return $newList;
   }
 }

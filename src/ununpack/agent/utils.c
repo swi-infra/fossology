@@ -1,27 +1,16 @@
-/*******************************************************************
- Copyright (C) 2011-2013 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011-2013 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- *******************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * \file
  * \brief Contains all utility functions used by FOSSology
- */
+**/
+
 #include "ununpack.h"
 #include "externs.h"
 #include "regex.h"
-#include "sha2.h"
 
 /**
  * \brief File mode BITS
@@ -592,6 +581,7 @@ void	CheckCommands	(int Show)
       case CMD_ARC:
       case CMD_AR:
       case CMD_PARTITION:
+      case CMD_ZSTD:
         CMD[i].Status = IsExe(CMD[i].Cmd,Quiet);
         break;
       default:
@@ -1457,33 +1447,6 @@ int	AddToRepository	(ContainerInfo *CI, char *Fuid, int Mask)
   return(IsUnique);
 } /* AddToRepository() */
 
-int calc_sha256sum(char*filename, char* dst) {
-    sha256_ctx ctx;
-    unsigned char buf[32];
-    unsigned char digest[32];
-    memset(digest, '\0', sizeof(digest));
-    FILE *f;
-    if(!(f=fopen(filename, "rb")))
-    {
-        LOG_FATAL("Failed to open file '%s'\n", filename);
-        return(1);
-    }
-    sha256_init(&ctx);
-
-    int i=0;
-    while((i=fread(buf, 1, sizeof(buf), f)) > 0) {
-        sha256_update(&ctx, buf, i);
-    }
-    sha256_final(&ctx, digest);
-    fclose(f);
-
-    for (i=0; i<32; i++) {
-        snprintf(dst+i*2, 3, "%02X", digest[i]);
-    }
-
-    return 0;
-}
-
 /**
  * @brief Print what can be printed in XML.
  * @param CI
@@ -1732,7 +1695,7 @@ char *PathCheck(char *DirPath)
     free(NewPath);
     NewPath = strdup(TmpPath);
   }
-
+#ifndef STANDALONE
   if ((subs = strstr(NewPath, "%R")) )
   {
     /* repo location substitution */
@@ -1742,7 +1705,7 @@ char *PathCheck(char *DirPath)
     free(NewPath);
     NewPath = strdup(TmpPath);
   }
-
+#endif
   return(NewPath);
 }
 

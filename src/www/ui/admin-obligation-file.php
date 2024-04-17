@@ -1,25 +1,14 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2014 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015-2017, Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2008-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015-2017 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
-
-use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\BusinessRules\ObligationMap;
 use Fossology\Lib\Db\DbManager;
+use Fossology\Lib\Util\StringOperation;
 
 define("TITLE_ADMIN_OBLIGATION_FILE", _("Obligations and Risks Administration"));
 
@@ -242,7 +231,7 @@ class admin_obligation_file extends FO_Plugin
            "<img border=0 src='" . Traceback_uri() . "images/button_edit.png'></a></td>";
 
       $ob .= "<td align=left>$row[ob_type]</td>";
-      $ob .= "<td align=left>$row[ob_topic]</td>";
+      $ob .= "<td align=left>" . htmlspecialchars($row["ob_topic"]) . "</td>";
       $vetext = htmlspecialchars($row['ob_text']);
       $ob .= "<td><textarea readonly=readonly rows=3 cols=40>$vetext</textarea></td> ";
       $ob .= "<td align=left>$row[ob_classification]</td>";
@@ -377,11 +366,11 @@ class admin_obligation_file extends FO_Plugin
   function Updatedb()
   {
     $obId = intval($_POST['ob_pk']);
-    $topic = trim($_POST['ob_topic']);
+    $topic = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_topic']));
     $licnames = $_POST['licenseSelector'];
     $candidatenames = $_POST['candidateSelector'];
-    $text = trim($_POST['ob_text']);
-    $comment = trim($_POST['ob_comment']);
+    $text = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_text']));
+    $comment = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_comment']));
 
     if (empty($topic)) {
       $text = _("ERROR: The obligation topic is empty.");
@@ -438,11 +427,11 @@ class admin_obligation_file extends FO_Plugin
    */
   function Adddb()
   {
-    $topic = trim($_POST['ob_topic']);
+    $topic = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_topic']));
     $licnames = empty($_POST['licenseSelector']) ? array() : $_POST['licenseSelector'];
     $candidatenames = empty($_POST['candidateSelector']) ? array() : $_POST['candidateSelector'];
-    $text = trim($_POST['ob_text']);
-    $comment = trim($_POST['ob_comment']);
+    $text = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_text']));
+    $comment = StringOperation::replaceUnicodeControlChar(trim($_POST['ob_comment']));
     $message = "";
 
     if (empty($topic)) {
@@ -469,7 +458,15 @@ class admin_obligation_file extends FO_Plugin
     $stmt = __METHOD__.'.ob';
     $sql = "INSERT into obligation_ref (ob_active, ob_type, ob_modifications, ob_topic, ob_md5, ob_text, ob_classification, ob_text_updatable, ob_comment) VALUES ($1, $2, $3, $4, md5($5), $5, $6, $7, $8) RETURNING ob_pk";
     $this->dbManager->prepare($stmt,$sql);
-    $res = $this->dbManager->execute($stmt,array($_POST['ob_active'],$_POST['ob_type'],$_POST['ob_modifications'],$topic,$text, $_POST['ob_classification'],$_POST['ob_text_updatable'],$comment));
+    $res = $this->dbManager->execute($stmt,
+      array($_POST['ob_active'],
+        $_POST['ob_type'],
+        $_POST['ob_modifications'],
+        $topic,
+        $text,
+        $_POST['ob_classification'],
+        $_POST['ob_text_updatable'],
+        $comment));
     $row = $this->dbManager->fetchArray($res);
     $obId = $row['ob_pk'];
 
@@ -492,13 +489,7 @@ class admin_obligation_file extends FO_Plugin
    */
   function Deldb()
   {
-    $stmt = __METHOD__.'.delob';
-    $sql = "DELETE FROM obligation_ref WHERE ob_pk=$1";
-    $this->dbManager->prepare($stmt,$sql);
-    $res = $this->dbManager->execute($stmt,array($_POST['ob_pk']));
-
-    $this->obligationMap->unassociateLicenseFromObligation($_POST['ob_pk']);
-    $this->obligationMap->unassociateLicenseFromObligation($_POST['ob_pk'], 0, true);
+    $this->obligationMap->deleteObligation($_POST['ob_pk']);
 
     return "<p>Obligation has been deleted.</p>";
   }

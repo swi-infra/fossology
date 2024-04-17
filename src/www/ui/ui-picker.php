@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2010-2013 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2010-2013 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
@@ -107,7 +96,7 @@ class ui_picker extends FO_Plugin
       // Name must be defined
       global $Plugins;
       $this->State = PLUGIN_STATE_VALID;
-      array_push($Plugins,$this);
+      $Plugins[] = $this;
     }
     return($this->State == PLUGIN_STATE_VALID);
   } // Initialize()
@@ -276,7 +265,7 @@ class ui_picker extends FO_Plugin
     $Uri2 = Traceback_uri() . "?mod=$this->Name";
 
     /* Box decorations */
-    $OutBuf .= "<div style='border: thin dotted gray; background-color:lightyellow'>\n";
+    $OutBuf .= "<div class='alert alert-info' style='padding:5px;'>\n";
 
     /* write the FolderList */
     $text = _("Folder");

@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- * Copyright (C) 2014-2017 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Page;
 
@@ -25,7 +14,6 @@ use Fossology\Lib\Dao\TreeDao;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Plugin\DefaultPlugin;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminLicenseCandidate extends DefaultPlugin
@@ -83,7 +71,6 @@ class AdminLicenseCandidate extends DefaultPlugin
     $shortname = $request->get('shortname') ?: $vars['rf_shortname'];
     $vars['shortname'] = $shortname;
     $rfText = $vars['rf_text'];
-    $vars['rf_text'] = $rfText;
 
     $suggest = intval($request->get('suggest_rf'));
     $suggestLicense = false;
@@ -100,6 +87,7 @@ class AdminLicenseCandidate extends DefaultPlugin
     }
     if ($suggestLicense !== false) {
       $vars['suggest_rf'] = $suggest;
+      $vars['suggest_spdx_id'] = $suggestLicense['rf_spdx_id'];
       $vars['suggest_shortname'] = $suggestLicense['rf_shortname'];
       $vars['suggest_fullname'] = $suggestLicense['rf_fullname'];
       $vars['suggest_text'] = $suggestLicense['rf_text'];
@@ -134,7 +122,12 @@ class AdminLicenseCandidate extends DefaultPlugin
         $vars['message'] = 'Short name must be unique';
         break;
       case 'merge':
-        $ok = $this->mergeCandidate($rf,$suggest,$vars);
+        try {
+          $ok = $this->mergeCandidate($rf,$suggest,$vars);
+        } catch (\Throwable $th) {
+          $vars['message'] = 'The license text already exists.';
+          break;
+        }
         if ($ok) {
           $vars = array(
               'aaData' => json_encode($this->getArrayArrayData()),
@@ -151,36 +144,39 @@ class AdminLicenseCandidate extends DefaultPlugin
     return $this->render('admin_license_candidate-merge.html.twig', $this->mergeWithDefault($vars));
   }
 
-  private function getArrayArrayData()
+  public function getCandidateArrayData()
   {
-    $sql = "SELECT rf_pk,rf_shortname,rf_fullname,rf_text,group_name,group_pk "
+    $sql = "SELECT rf_pk,rf_spdx_id,rf_shortname,rf_fullname,rf_text,group_name,group_pk "
             . "FROM license_candidate, groups "
             . "WHERE group_pk=group_fk AND marydone";
     /* @var $dbManager DbManager */
     $dbManager = $this->getObject('db.manager');
-    $dbManager->prepare($stmt = __METHOD__, $sql);
-    $res = $dbManager->execute($stmt);
+    return $dbManager->getRows($sql, [], __METHOD__);
+  }
+
+  private function getArrayArrayData()
+  {
+    $rows = $this->getCandidateArrayData();
     $aaData = array();
     $delete = "";
-    while ($row = $dbManager->fetchArray($res)) {
+    foreach ($rows as $row) {
       $link = Traceback_uri() . '?mod=' . self::NAME . '&rf=' . $row['rf_pk'];
       $edit = '<a href="' . $link . '"><img border="0" src="images/button_edit.png"></a>';
       $delete = '<img border="0" id="deletecandidate'.$row['rf_pk'].'" onClick="deleteCandidate('.$row['rf_pk'].')" src="images/icons/close_16.png">';
 
-      $aaData[] = array($edit, htmlentities($row['rf_shortname']),
-          htmlentities($row['rf_fullname']),
-          '<div style="overflow-y:scroll;max-height:150px;margin:0;">' . nl2br(htmlentities($row['rf_text'])) . '</div>',
-          htmlentities($row['group_name']),$delete
-          );
+      $aaData[] = array($edit, htmlentities($row['rf_spdx_id']),
+        htmlentities($row['rf_shortname']), htmlentities($row['rf_fullname']),
+        '<div style="overflow-y:scroll;max-height:150px;margin:0;">' . nl2br(htmlentities($row['rf_text'])) . '</div>',
+        htmlentities($row['group_name']),$delete
+      );
     }
-    $dbManager->freeResult($res);
     return $aaData;
   }
 
 
-  private function getDataRow($licId,$table='license_candidate')
+  public function getDataRow($licId,$table='license_candidate')
   {
-    $sql = "SELECT rf_pk,rf_shortname,rf_fullname,rf_text,rf_url,rf_notes,rf_notes,rf_risk";
+    $sql = "SELECT rf_pk,rf_spdx_id,rf_shortname,rf_fullname,rf_text,rf_url,rf_notes,rf_notes,rf_risk";
     if ($table == 'license_candidate') {
       $sql .= ',group_name,group_pk FROM license_candidate LEFT JOIN groups ON group_pk=group_fk '
               . 'WHERE rf_pk=$1 AND marydone';
@@ -193,13 +189,13 @@ class AdminLicenseCandidate extends DefaultPlugin
     return $row;
   }
 
-  private function suggestLicenseId($str)
+  public function suggestLicenseId($str, $fromRest = false)
   {
     /* @var $monkOneShotPlugin \Fossology\Monk\UI\Oneshot */
     $monkOneShotPlugin = plugin_find("oneshot-monk");
 
     if (null !== $monkOneShotPlugin) {
-      return $monkOneShotPlugin->scanMonkRendered($str);
+      return $monkOneShotPlugin->scanMonkRendered($str, $fromRest);
     } else {
       return array(array(), $str);
     }
@@ -211,7 +207,7 @@ class AdminLicenseCandidate extends DefaultPlugin
    * @param int $rfParent
    * @return bool
    */
-  private function verifyCandidate($rf, $shortname, $rfParent)
+  public function verifyCandidate($rf, $shortname, $rfParent)
   {
     /* @var $licenseDao LicenseDao */
     $licenseDao = $this->getObject('dao.license');
@@ -222,10 +218,10 @@ class AdminLicenseCandidate extends DefaultPlugin
     /* @var $dbManager DbManager */
     $dbManager = $this->getObject('db.manager');
     $dbManager->begin();
-    $dbManager->getSingleRow('INSERT INTO license_ref (rf_pk, rf_shortname, rf_text, rf_url, rf_add_date, rf_copyleft,
+    $dbManager->getSingleRow('INSERT INTO license_ref (rf_pk, rf_spdx_id, rf_shortname, rf_text, rf_url, rf_add_date, rf_copyleft,
         "rf_OSIapproved", rf_fullname, "rf_FSFfree", "rf_GPLv2compatible", "rf_GPLv3compatible", rf_notes, "rf_Fedora",
         marydone, rf_active, rf_text_updatable, rf_md5 , rf_detector_type, rf_risk)
-      (SELECT rf_pk, $2 as rf_shortname, rf_text, rf_url, now() as rf_add_date, rf_copyleft,
+      (SELECT rf_pk, rf_spdx_id, $2 as rf_shortname, rf_text, rf_url, now() as rf_add_date, rf_copyleft,
         "rf_OSIapproved", rf_fullname, "rf_FSFfree", "rf_GPLv2compatible", "rf_GPLv3compatible", rf_notes, "rf_Fedora",
         false AS marydone, rf_active, rf_text_updatable, md5(rf_text) rf_md5 , 1 rf_detector_type, rf_risk
   FROM license_candidate WHERE rf_pk=$1)',array($rf,$shortname),__METHOD__.'.insert');
@@ -235,12 +231,12 @@ class AdminLicenseCandidate extends DefaultPlugin
     return true;
   }
 
-  private function mergeCandidate($candidate, $suggest, $vars)
+  public function mergeCandidate($candidate, $suggest, $vars)
   {
     /** @var DbManager */
     $dbManager = $this->getObject('db.manager');
     $tableColumnMap = array("license_file"=>"rf_fk",
-        "license_ref_bulk"=>"rf_fk",
+        "license_set_bulk"=>"rf_fk",
         "clearing_event"=>"rf_fk");
     foreach ($tableColumnMap as $table=>$column) {
       $dbManager->prepare($stmt=__METHOD__.".$table","UPDATE $table SET $column=$1 WHERE $column=$2");
@@ -265,7 +261,7 @@ class AdminLicenseCandidate extends DefaultPlugin
     return true;
   }
 
-  protected function doDeleteCandidate($rfPk)
+  public function doDeleteCandidate($rfPk,$includeHtml=true)
   {
     $dbManager = $this->getObject('db.manager');
     $stmt = __METHOD__.".getUploadtreeFkForUsedCandidates";
@@ -284,11 +280,12 @@ class AdminLicenseCandidate extends DefaultPlugin
       return new Response('true', Response::HTTP_OK, array('Content-type'=>'text/plain'));
     } else {
       $treeDao = $this->getObject('dao.tree');
-      $message = "<div class='candidateFileList'><ol>";
+      $message = $includeHtml ? "<div class='candidateFileList'><ol>":"";
       foreach ($dataFetch as $cnt => $uploadTreeFk) {
-        $message .= "<li>".$treeDao->getFullPath($uploadTreeFk['uploadtree_fk'], 'uploadtree')."</li>";
+        $path= $treeDao->getFullPath($uploadTreeFk['uploadtree_fk'], 'uploadtree');
+        $message .= $includeHtml ? "<li>".$path."</li>":$path;
       }
-      $message .= "</ol></div>";
+      $message .= $includeHtml ? "</ol></div>":"";
       return new Response($message, Response::HTTP_OK, array('Content-type'=>'text/plain'));
     }
   }

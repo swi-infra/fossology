@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019, 2021 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * State and CLI options for OJO agent
@@ -36,12 +25,21 @@ class OjoCliOptions
   private:
     int verbosity;  /**< The verbosity level */
     bool json;      /**< Whether to generate JSON output */
+    bool ignoreFilesWithMimeType; /**< Ignore files with particular mimetype */
+    int userId;     /**< User running the agent */
+    int groupId;    /**< Group running the agent */
 
   public:
+    void setUserId(const int);
+    void setGroupId(const int);
+
     bool isVerbosityDebug() const;
     bool doJsonOutput() const;
+    bool doignoreFilesWithMimeType() const;
+    int getUserId() const;
+    int getGroupId() const;
 
-    OjoCliOptions(int verbosity, bool json);
+    OjoCliOptions(int verbosity, bool json, bool ignoreFilesWithMimeType);
     OjoCliOptions();
 };
 

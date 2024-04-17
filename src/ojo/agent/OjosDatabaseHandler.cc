@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Data base handler for OJO
@@ -36,34 +25,14 @@ OjosDatabaseHandler::OjosDatabaseHandler(DbManager dbManager) :
 /**
  * Get a vector of all file id for a given upload id.
  * @param uploadId Upload ID to be queried
+ * @param agentId  Current agent ID
+ * @param ignoreFilesWithMimeType To ignore files with particular mimetype
  * @return List of all pfiles for the given upload
  */
-vector<unsigned long> OjosDatabaseHandler::queryFileIdsForUpload(int uploadId)
+vector<unsigned long> OjosDatabaseHandler::queryFileIdsForUpload (
+    int uploadId, int agentId, bool ignoreFilesWithMimeType)
 {
-  return queryFileIdsVectorForUpload(uploadId);
-}
-
-/**
- * Get a vector of all file id for a given upload id which are not scanned by the given agentId.
- * @param uploadId Upload ID to be queried
- * @param agentId  ID of the agent
- * @return List of all pfiles for the given upload
- */
-vector<unsigned long> OjosDatabaseHandler::queryFileIdsForScan(int uploadId, int agentId)
-{
-  string uploadtreeTableName = queryUploadTreeTableName(uploadId);
-
-  QueryResult queryResult = dbManager.execPrepared(
-    fo_dbManager_PrepareStamement(dbManager.getStruct_dbManager(),
-      ("pfileForUploadFilterAgent" + uploadtreeTableName).c_str(),
-      ("SELECT distinct(ut.pfile_fk) FROM " + uploadtreeTableName + " AS ut "
-      "LEFT JOIN license_file AS lf ON ut.pfile_fk = lf.pfile_fk "
-      "AND lf.agent_fk = $2 WHERE lf.pfile_fk IS NULL "
-      "AND ut.upload_fk = $1 AND (ut.ufile_mode&x'3C000000'::int)=0;").c_str(),
-      int, int),
-    uploadId, agentId);
-
-  return queryResult.getSimpleResults(0, fo::stringToUnsignedLong);
+  return queryFileIdsVectorForUpload(uploadId, agentId, ignoreFilesWithMimeType);
 }
 
 /**
@@ -179,11 +148,17 @@ bool hasEnding(string const &firstString, string const &ending)
  * -# `GPL-2.0 and GPL-2.0-only` are treated as same
  * -# `GPL-2.0+ and GPL-2.0-or-later` are treated as same
  *
+ * @note
+ * If the agent could not find license in main license, it will create a new one
+ * as candidate license.
+ *
  * @param rfShortName Short name to be searched.
+ * @param groupId     Group id for candidate license
+ * @param userId      User who is running the agent
  * @returns License id, 0 on failure
  */
 unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
-    string rfShortName)
+    string rfShortName, const int groupId, const int userId)
 {
   bool success = false;
   unsigned long result = 0;
@@ -197,11 +172,21 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
   fo_dbManager_PreparedStatement *searchWithOr = fo_dbManager_PrepareStamement(
       dbManager.getStruct_dbManager(),
       "selectLicenseIdWithOrOJO",
-      "SELECT rf_pk FROM ONLY license_ref"
+      "WITH mainLicense AS ("
+      " SELECT rf_pk, 1 AS prior FROM ONLY license_ref"
       " WHERE LOWER(rf_shortname) = LOWER($1)"
       " OR LOWER(rf_shortname) = LOWER($2)"
-      " ORDER BY rf_pk ASC;",
-      char*, char*);
+      "), candidateLicense AS ("
+      " SELECT rf_pk, 2 AS prior FROM license_candidate"
+      " WHERE (LOWER(rf_shortname) = LOWER($1)"
+      " OR LOWER(rf_shortname) = LOWER($2))"
+      " AND group_fk = $3"
+      ")"
+      "SELECT rf_pk, prior FROM mainLicense "
+      "UNION "
+      "SELECT rf_pk, prior FROM candidateLicense "
+      "ORDER BY prior;",
+      char*, char*, int);
 
   /* First check similar matches */
   /* Check if the name ends with +, -or-later, -only */
@@ -228,7 +213,8 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
     }
 
     QueryResult queryResult = dbManager.execPrepared(searchWithOr,
-        (tempShortName + plus).c_str(), (tempShortName + orLater).c_str());
+        (tempShortName + plus).c_str(), (tempShortName + orLater).c_str(),
+        groupId);
 
     success = queryResult && queryResult.getRowCount() > 0;
     if (success)
@@ -253,7 +239,7 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
     }
 
     QueryResult queryResult = dbManager.execPrepared(searchWithOr,
-        tempShortName.c_str(), (tempShortName + only).c_str());
+        tempShortName.c_str(), (tempShortName + only).c_str(), groupId);
 
     success = queryResult && queryResult.getRowCount() > 0;
     if (success)
@@ -265,6 +251,16 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
   if (result > 0)
   {
     return result;
+  }
+
+  if (groupId < 1)
+  {
+    return 0;
+  }
+
+  if (userId < 1)
+  {
+    return 0;
   }
 
   unsigned count = 0;
@@ -285,8 +281,10 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
           " WHERE LOWER(rf_shortname) = LOWER($1)"
           "),"
           "insertNew AS ("
-          "INSERT INTO license_ref(rf_shortname, rf_text, rf_detector_type)"
-          " SELECT $1, $2, $3"
+          "INSERT INTO license_candidate"
+          "(rf_shortname, rf_text, rf_detector_type, group_fk, "
+          "rf_user_fk_created, rf_user_fk_modified)"
+          " SELECT $1, $2, $3, $4, $5, $5"
           " WHERE NOT EXISTS(SELECT * FROM selectExisting)"
           " RETURNING rf_pk"
           ") "
@@ -294,9 +292,9 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
           "SELECT rf_pk FROM insertNew "
           "UNION "
           "SELECT rf_pk FROM selectExisting",
-          char*, char*, int
+          char*, char*, int, int, int
         ),
-        rfShortName.c_str(), "License by OJO.", 3);
+        rfShortName.c_str(), "License by OJO.", 3, groupId, userId);
 
     success = queryResult && queryResult.getRowCount() > 0;
 
@@ -324,16 +322,18 @@ unsigned long OjosDatabaseHandler::selectOrInsertLicenseIdForName(
  * The function first checks if the license exists in the cache list. If the
  * license is not cached, it checks in DB and store in the cache.
  * @param rfShortName Short name to be searched
+ * @param groupId     Group running the agent
+ * @param userId      UserRunning the agent
  * @returns License ID if found, 0 otherwise
  * @sa OjosDatabaseHandler::getCachedLicenseIdForName()
  */
 unsigned long OjosDatabaseHandler::getLicenseIdForName(
-    string const &rfShortName)
+    string const &rfShortName, const int groupId, const int userId)
 {
   unsigned long licenseId = getCachedLicenseIdForName(rfShortName);
   if (licenseId == 0)
   {
-    licenseId = selectOrInsertLicenseIdForName(rfShortName);
+    licenseId = selectOrInsertLicenseIdForName(rfShortName, groupId, userId);
     licenseRefCache.insert(std::make_pair(rfShortName, licenseId));
   }
   return licenseId;

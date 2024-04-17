@@ -1,4 +1,9 @@
 <?php
+/*
+ SPDX-FileCopyrightText: © Fossology contributors
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  *	@package	SimpleTest
  *	@subpackage	Extensions
@@ -119,4 +124,3 @@ class JUnitXMLReporter extends SimpleReporter {
         $this->currCase->appendChild($ch);
     }
 }
-?>

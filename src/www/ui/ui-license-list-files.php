@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- * Copyright (C) 2009-2014 Hewlett-Packard Development Company, L.P.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2009-2014 Hewlett-Packard Development Company, L.P.
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Dao\AgentDao;
 use Fossology\Lib\Dao\UploadDao;
@@ -155,11 +144,11 @@ class LicenseListFiles extends FO_Plugin
         if (empty($row)) {
           continue;
         }
-        array_push($sorted_file_result, $row);
+        $sorted_file_result[] = $row;
         for ($j = $i + 1; $j < $max_num; $j ++) {
           $row_next = $file_result_temp[$j];
           if (! empty($row_next) && ($row['pfile_fk'] == $row_next['pfile_fk'])) {
-            array_push($sorted_file_result, $row_next);
+            $sorted_file_result[] = $row_next;
             $file_result_temp[$j] = null;
           }
         }
@@ -196,8 +185,6 @@ class LicenseListFiles extends FO_Plugin
       $baseURL = "?mod=" . $this->Name . "&item=$uploadtree_pk&lic=$ushortname&page=-1";
 
       $V .= "<table>";
-      $text = _("File");
-      $V .= "<tr><th>$text</th><th>&nbsp";
       $LastPfilePk = -1;
       $ExclArray = explode(":", $Excl);
       $ExclicArray = explode(":", $Exclic);

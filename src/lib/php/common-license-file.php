@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2009-2014 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2014 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2009-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014 Siemens AG
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -110,7 +99,7 @@ function GetFileLicenses_string($agent_pk, $pfile_pk, $uploadtree_pk, $uploadtre
 {
   $LicStr = "";
   $LicArray = GetFileLicenses($agent_pk, $pfile_pk, $uploadtree_pk, $uploadtree_tablename);
-  return implode($LicArray,', ');
+  return implode(', ', $LicArray);
 }
 
 /**
@@ -134,7 +123,7 @@ function GetFileLicenses_string($agent_pk, $pfile_pk, $uploadtree_pk, $uploadtre
  */
 function GetFilesWithLicense($agent_pk, $rf_shortname, $uploadtree_pk,
                              $PkgsOnly=false, $offset=0, $limit="ALL",
-                             $order="", $tag_pk=null, $uploadtree_tablename)
+                             $order="", $tag_pk=null, $uploadtree_tablename="uploadtree")
 {
   global $PG_CONN;
 
@@ -149,7 +138,8 @@ function GetFilesWithLicense($agent_pk, $rf_shortname, $uploadtree_pk,
   pg_free_result($result);
 
   /* Find rf_pk for rf_shortname.  This will speed up the main query tremendously */
-  $sql = "SELECT rf_pk FROM license_ref WHERE rf_shortname='$rf_shortname'";
+  $pg_shortname = pg_escape_string($rf_shortname);
+  $sql = "SELECT rf_pk FROM license_ref WHERE rf_shortname='$pg_shortname'";
   $result = pg_query($PG_CONN, $sql);
   DBCheckResult($result, $sql, __FILE__, __LINE__);
   $row = pg_fetch_assoc($result);
@@ -162,8 +152,6 @@ function GetFilesWithLicense($agent_pk, $rf_shortname, $uploadtree_pk,
   if (empty($rf_pk)) {
     return array(); // if when the rf_shortname does not exist
   }
-
-  $shortname = pg_escape_string($rf_shortname);
 
   /* Optional tag restriction */
   if (empty($tag_pk)) {
@@ -224,7 +212,7 @@ function GetFilesWithLicense($agent_pk, $rf_shortname, $uploadtree_pk,
  *
  * \returns Array of uploadtree_pk ==> ufile_name
  */
-function Level1WithLicense($agent_pk, $rf_shortname, $uploadtree_pk, $PkgsOnly=false, $uploadtree_tablename)
+function Level1WithLicense($agent_pk, $rf_shortname, $uploadtree_pk, $PkgsOnly=false, $uploadtree_tablename="uploadtree")
 {
   $pkarray = array();
 
@@ -285,6 +273,7 @@ function Level1WithLicense($agent_pk, $rf_shortname, $uploadtree_pk, $PkgsOnly=f
 function FileListLinks($upload_fk, $uploadtree_pk, $napk, $pfile_pk, $Recurse=True, &$UniqueTagArray = array(), $uploadtree_tablename = "uploadtree", $wantTags=true)
 {
   $LinkStr = "";
+  global $SysConf;
 
   if ($pfile_pk) {
     $text = _("View");
@@ -293,7 +282,10 @@ function FileListLinks($upload_fk, $uploadtree_pk, $napk, $pfile_pk, $Recurse=Tr
 
     $LinkStr .= "[<a href='" . Traceback_uri() . "?mod=view-license&upload=$upload_fk&item=$uploadtree_pk&napk=$napk' >$text</a>]";
     $LinkStr .= "[<a href='" . Traceback_uri() . "?mod=view_info&upload=$upload_fk&item=$uploadtree_pk&show=detail' >$text1</a>]";
-    $LinkStr .= "[<a href='" . Traceback_uri() . "?mod=download&upload=$upload_fk&item=$uploadtree_pk' >$text2</a>]";
+    if ($_SESSION['UserLevel'] >= $SysConf['SYSCONFIG']['SourceCodeDownloadRights']) {
+      $LinkStr .= "[<a href='" . Traceback_uri() . "?mod=download&upload=$upload_fk&item=$uploadtree_pk' >$text2</a>]";
+    }
+
   }
 
   /********  Tag  ********/

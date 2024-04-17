@@ -1,22 +1,11 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2013 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015-2018 Siemens AG
- Copyright (C) 2019 Orange
+/*
+ SPDX-FileCopyrightText: © 2008-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015-2018 Siemens AG
+ SPDX-FileCopyrightText: © 2019 Orange
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 define("TITLE_DASHBOARD_GENERAL", _("Overview Dashboard"));
 
@@ -24,26 +13,28 @@ use Fossology\Lib\Db\DbManager;
 
 class dashboard extends FO_Plugin
 {
-  protected $pgVersion;
+  public $pgVersion;
 
   /** @var DbManager */
   private $dbManager;
 
   function __construct()
   {
+    global $PG_CONN;
     $this->Name       = "dashboard";
     $this->Title      = TITLE_DASHBOARD_GENERAL;
     $this->MenuList   = "Admin::Dashboards::Overview";
     $this->DBaccess   = PLUGIN_DB_ADMIN;
     parent::__construct();
     $this->dbManager = $GLOBALS['container']->get('db.manager');
+    $this->pgVersion = pg_version($PG_CONN);
   }
 
   /**
    * \brief Return each html row for DatabaseContents()
    * \returns html table row
    */
-  function DatabaseContentsRow($TableName, $TableLabel)
+  function DatabaseContentsRow($TableName, $TableLabel, $fromRest = false)
   {
     $row = $this->dbManager->getSingleRow(
       "select sum(reltuples) as val from pg_class where relname like $1 and reltype !=0",
@@ -71,6 +62,15 @@ class dashboard extends FO_Plugin
     $V .= "<td $mystyle>" . substr($LastAnalyzeTime, 0, 16) . "</td>";
 
     $V .= "</tr>\n";
+
+    if ($fromRest) {
+      return [
+        "metric" => $TableLabel,
+        "total" => intval($item_count),
+        "lastVacuum" => $LastVacTime,
+        "lastAnalyze" => $LastAnalyzeTime
+      ];
+    }
     return $V;
   }
 
@@ -124,10 +124,12 @@ class dashboard extends FO_Plugin
     return $this->GetLastAnalyzeTimeOrVacTime("last_vacuum, last_autovacuum",$TableName);
   }
 
-  function GetPHPInfoTable()
+  function GetPHPInfoTable($fromRest = false)
   {
     $PHP_VERSION = phpversion();
     $loadedModules = get_loaded_extensions();
+
+    $restRes = [];
 
     $table = "
 <table class='infoTable' border=1>
@@ -153,9 +155,16 @@ class dashboard extends FO_Plugin
       Loaded Extensions
       </td>
       <td><div class='infoTable'>";
+
+    $restRes['phpVersion'] = $PHP_VERSION;
+    $restRes['loadedExtensions'] = [];
     foreach ($loadedModules as $currentExtensionName) {
       $currentVersion = phpversion($currentExtensionName);
       $table .= $currentExtensionName . ": " . $currentVersion . "<br />";
+      $restRes['loadedExtensions'][] = [
+        'name' => $currentExtensionName,
+        'version' => $currentVersion
+      ];
     }
 
     $table .="</div></td>
@@ -164,6 +173,10 @@ class dashboard extends FO_Plugin
 </table>
 
   ";
+
+    if ($fromRest) {
+      return $restRes;
+    }
     return $table;
   }
 
@@ -178,9 +191,9 @@ class dashboard extends FO_Plugin
    * \brief Database metrics
    * \returns html table containing metrics
    */
-  function DatabaseMetrics()
+  function DatabaseMetrics($fromRest = false)
   {
-
+    $restRes = [];
     $V = "<table border=1>\n";
     $text = _("Metric");
     $text1 = _("Total");
@@ -194,10 +207,20 @@ class dashboard extends FO_Plugin
     $V .= "<tr><td>$text</td>";
     $V .= "<td align='right'> $Size </td></tr>\n";
 
+    $restRes[] = [
+      "metric" => $text,
+      "total" => $row['val']
+    ];
+
     /**** Version ****/
     $text = _("Postgresql version");
     $V .= "<tr><td>$text</td>";
     $V .= "<td align='right'> {$this->pgVersion['server']} </td></tr>\n";
+
+    $restRes[] = [
+      "metric" => $text,
+      "total" => $this->pgVersion['server']
+    ];
 
     /**** Query stats ****/
     // count current queries
@@ -212,6 +235,15 @@ class dashboard extends FO_Plugin
 
     $V .= "</table>\n";
 
+    $restRes[] = [
+      "metric" => $text,
+      "total" => $connection_count
+    ];
+
+    if ($fromRest) {
+      return $restRes;
+    }
+
     return $V;
   }
 
@@ -219,14 +251,16 @@ class dashboard extends FO_Plugin
   /**
    * \brief Database queries
    * \returns html table containing query strings, pid, and start time
+   * @throws Exception
    */
-  function DatabaseQueries()
+  function DatabaseQueries($fromRest = false)
   {
     $V = "<table border=1 id='databaseTable'>\n";
     $head1 = _("PID");
     $head2 = _("Query");
     $head3 = _("Started");
     $head4 = _("Elapsed");
+    $restRes = [];
     $V .= "<tr><th>$head1</th><th>$head2</th><th>$head3</th><th>$head4</th></tr>\n";
     $getCurrentVersion = explode(" ", $this->pgVersion['server']);
     $currentVersion = str_replace(".", "", $getCurrentVersion[0]);
@@ -234,7 +268,7 @@ class dashboard extends FO_Plugin
     $oldVersion = str_replace(".", "", "9.2");
     $current_query = ($currentVersion >= $oldVersion) ? "state" : "current_query";
     $procpid = ($currentVersion >= $oldVersion) ? "pid" : "procpid";
-    $sql = "SELECT $procpid processid, $current_query, query_start, now()-query_start AS elapsed FROM pg_stat_activity WHERE $current_query != '<IDLE>' AND datname = 'fossology' ORDER BY $procpid";
+    $sql = "SELECT $procpid processid, $current_query, query_start AT TIME ZONE 'UTC' AS query_start, now()-query_start AS elapsed FROM pg_stat_activity WHERE $current_query != '<IDLE>' AND datname = 'fossology' ORDER BY $procpid";
 
     $statementName = __METHOD__."queryFor_".$current_query."_orderBy_".$procpid;
     $this->dbManager->prepare($statementName,$sql);
@@ -249,10 +283,17 @@ class dashboard extends FO_Plugin
         $V .= "<td class='dashboard'>$row[processid]</td>";
         $V .= "<td class='dashboard'>" . htmlspecialchars($row[$current_query]) .
           "</td>";
-        $StartTime = substr($row['query_start'], 0, 19);
+        $StartTime = Convert2BrowserTime(substr($row['query_start'], 0, 19));
         $V .= "<td class='dashboard'>$StartTime</td>";
         $V .= "<td class='dashboard'>$row[elapsed]</td>";
         $V .= "</tr>\n";
+        $dt = new DateTime($row['query_start'], new DateTimeZone("UTC"));
+        $restRes[] = [
+          "pid" => $row['processid'],
+          "query" => htmlspecialchars($row[$current_query]),
+          "startTime" => $dt->format("Y-m-d\\TH:i:s.v\\Z"),
+          "elapsed" => $row['elapsed']
+        ];
       }
     } else {
       $V .= "<tr><td class='dashboard' colspan=4>There are no active FOSSology queries</td></tr>";
@@ -261,6 +302,9 @@ class dashboard extends FO_Plugin
     pg_free_result($result);
     $V .= "</table>\n";
 
+    if ($fromRest) {
+      return $restRes;
+    }
     return $V;
   }
 
@@ -268,10 +312,12 @@ class dashboard extends FO_Plugin
   /**
    * \brief Determine amount of free disk space.
    */
-  function DiskFree()
+  function DiskFree($fromRest = false)
   {
     global $SYSCONFDIR;
     global $SysConf;
+
+    $restRes = [];
 
     $Cmd = "df -hP";
     $Buf = $this->DoCmd($Cmd);
@@ -280,8 +326,7 @@ class dashboard extends FO_Plugin
     $Lines = explode("\n",$Buf);
 
     /* Display results */
-    $V = "";
-    $V .= "<table border=1>\n";
+    $V = "<table border=1>\n";
     $head0 = _("Filesystem");
     $head1 = _("Capacity");
     $head2 = _("Used");
@@ -334,6 +379,15 @@ class dashboard extends FO_Plugin
       $V .= "<td align='right' $mystyle>$List[4]</td>";
 
       $V .= "<td align='left'>" . htmlentities($List[5]) . "</td></tr>\n";
+
+      $restRes["data"][] = [
+        "filesystem" => htmlentities($List[0]),
+        "capacity" => $List[1],
+        "used" => $List[2],
+        "available" => $List[3],
+        "percentFull" => $List[4],
+        "mountPoint" => htmlentities($List[5])
+      ];
     }
     $V .= "</table>\n";
 
@@ -359,16 +413,22 @@ class dashboard extends FO_Plugin
     // FOSSology config location
     $V .= $Indent . _("FOSSology config") . ": " . $SYSCONFDIR . "<br>";
 
-    return($V);
+    $restRes["notes"] = [
+      "database" => $DargArray[0],
+      "repository" => $SysConf['FOSSOLOGY']['path'],
+      "fossologyConfig" => $SYSCONFDIR
+    ];
+
+    if ($fromRest) {
+      return $restRes;
+    }
+    return ($V);
   }
 
   public function Output()
   {
-    global $PG_CONN;
-    $this->pgVersion = pg_version($PG_CONN);
 
-    $V="";
-    $V .= "<table style='width: 100%;' border=0>\n";
+    $V = "<table style='width: 100%;' border=0>\n";
     $V .= "<tr>";
     $V .= "<td valign='top'>\n";
     $text = _("Database Contents");

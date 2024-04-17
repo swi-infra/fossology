@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2012 Hewlett-Packard Development Company, L.P.
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -53,7 +42,7 @@ function ReportCacheGet($CacheKey)
   global $UserCacheStat;
 
   /* Purge old entries ~ 1/500 of the times this fcn is called */
-  if (rand(1, 500) == 1) {
+  if (random_int(1, 500) == 1) {
     ReportCachePurgeByDate(" now() - interval '365 days'");
   }
 
@@ -86,6 +75,9 @@ function ReportCacheGet($CacheKey)
   $result = pg_query($PG_CONN, $sql);
   DBCheckResult($result, $sql, __FILE__, __LINE__);
   $row = pg_fetch_assoc($result);
+  if ($row == false) {
+    return;
+  }
   $cashedvalue = $row['report_cache_value'];
   pg_free_result($result);
   return $cashedvalue;

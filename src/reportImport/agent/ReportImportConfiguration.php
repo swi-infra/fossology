@@ -1,20 +1,9 @@
 <?php
 /*
- * Copyright (C) 2017, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2017 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 namespace Fossology\ReportImport;
 
 use Fossology\Lib\Data\DecisionTypes;
@@ -28,7 +17,8 @@ class ReportImportConfiguration
     'addConcludedAsDecisionsOverwrite', // => $overwriteDecisions
     'addCopyrights', // => $addCopyrightInformation
     'addConcludedAsDecisionsTBD', // => $concludeLicenseDecisionType
-    'addNewLicensesAs' // => $createLicensesAsCandidate
+    'addNewLicensesAs', // => $createLicensesAsCandidate
+    'licenseMatch' // => $matchLicenseNameWith
   );
 
   protected $createLicensesAsCandidate = true;
@@ -38,6 +28,7 @@ class ReportImportConfiguration
   protected $overwriteDecisions = false;
   protected $addCopyrightInformation = false;
   protected $concludeLicenseDecisionType = DecisionTypes::IDENTIFIED;
+  protected $matchLicenseNameWithSPDX = true;
 
   private function getFromArgs($args, $num, $expected="true")
   {
@@ -59,6 +50,7 @@ class ReportImportConfiguration
     }
 
     $this->createLicensesAsCandidate = $this->getFromArgs($args, 6, "candidate");
+    $this->matchLicenseNameWithSPDX = $this->getFromArgs($args, 7, "spdxid");
 
     $this->echoConfiguration();
   }
@@ -80,6 +72,7 @@ class ReportImportConfiguration
     echo "\nINFO: \$overwriteDecisions is: "                  .$this->var_dump($this->overwriteDecisions);
     echo "\nINFO: \$addCopyrightInformation is: "             .$this->var_dump($this->addCopyrightInformation);
     echo "\nINFO: \$concludeLicenseDecisionType is: "         .$this->var_dump($this->concludeLicenseDecisionType);
+    echo "\nINFO: \$matchLicenseNameWithSPDX is: "            .$this->var_dump($this->matchLicenseNameWithSPDX);
     echo "\n";
   }
 
@@ -147,5 +140,14 @@ class ReportImportConfiguration
   public function isAddCopyrightInformation()
   {
     return $this->addCopyrightInformation;
+  }
+
+  /**
+   * Should use SPDX ID to match license name?
+   * @return bool
+   */
+  public function shouldMatchLicenseNameWithSPDX()
+  {
+    return $this->matchLicenseNameWithSPDX;
   }
 }

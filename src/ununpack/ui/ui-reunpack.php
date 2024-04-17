@@ -1,21 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2013 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2013 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
-
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Reunpack the archive
@@ -91,7 +79,8 @@ class ui_reunpack extends FO_Plugin
    * @param int $uploadpk         Upload id
    * @param string $job_name      Job name
    * @param string $jobqueue_type Job queue type for DB
-   * @return 0 no reunpack/rewget job running;
+   * @return int
+   * - 0 no reunpack/rewget job running
    * - 1 reunpack/rewget job failed
    * - 2 reunpack/rewget job completed
    * - 3 reunpack/rewget job running
@@ -178,21 +167,19 @@ class ui_reunpack extends FO_Plugin
     $row = pg_fetch_assoc($result);
     pg_free_result($result);
 
-    if (!empty($row)){
-      $jobpk = $row['job_pk'];
-    } else {
+    if (empty($row)) {
       $result = pg_query($PG_CONN, $SQLInsert);
       DBCheckResult($result, $SQLInsert, __FILE__, __LINE__);
       $row = pg_fetch_assoc($result);
       pg_free_result($result);
       $SQLcheck = "SELECT job_pk FROM job WHERE job_upload_fk = '$uploadpk'"
-        . " AND job_name = '$Job_name' AND job_user_fk = '$user_fk';";
+          . " AND job_name = '$Job_name' AND job_user_fk = '$user_fk';";
       $result = pg_query($PG_CONN, $SQLcheck);
       DBCheckResult($result, $SQLcheck, __FILE__, __LINE__);
       $row = pg_fetch_assoc($result);
       pg_free_result($result);
-      $jobpk = $row['job_pk'];
     }
+    $jobpk = $row['job_pk'];
 
     if (empty($jobpk) || ($jobpk < 0)) { return("Failed to insert job record! $SQLInsert"); }
     if (!empty($Depends) && !is_array($Depends)) { $Depends = array($Depends); }
@@ -247,8 +234,7 @@ class ui_reunpack extends FO_Plugin
     if (empty($Fin_gold))
     {
       $text = _("The File's Gold file is not available in the repository.");
-      $V = "<p/>$text\n";
-      return $V;
+      return "<p/>$text\n";
     }
 
     $V = "<p/>";
@@ -269,5 +255,3 @@ class ui_reunpack extends FO_Plugin
   }
 }
 $NewPlugin = new ui_reunpack;
-
-?>

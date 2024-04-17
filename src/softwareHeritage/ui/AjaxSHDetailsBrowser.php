@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
-Copyright (C) 2019
-Author: Sandip Kumar Bhuyan<sandipbhyan@gmail.com>
+/*
+ SPDX-FileCopyrightText: © 2019 Sandip Kumar Bhuyan <sandipbhuyan@gmail.com>
+ Author: Sandip Kumar Bhuyan<sandipbhyan@gmail.com>
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\Dao\AgentDao;
@@ -47,7 +36,7 @@ class AjaxSHDetailsBrowser extends DefaultPlugin
    */
   private $shDao;
   /**
-   * configuraiton for software heritage api
+   * Configuration for software heritage api
    * @var array $configuration
    */
   private $configuration;
@@ -67,7 +56,14 @@ class AjaxSHDetailsBrowser extends DefaultPlugin
     $this->licenseDao = $this->getObject('dao.license');
     $this->agentDao = $this->getObject('dao.agent');
     $this->shDao = $this->container->get('dao.softwareHeritage');
-    $this->configuration = parse_ini_file(__DIR__ . '/../agent/softwareHeritage.conf');
+    $sysconfig = $GLOBALS['SysConf']['SYSCONFIG'];
+    $this->configuration = [
+      'url' => trim($sysconfig['SwhURL']),
+      'uri' => trim($sysconfig['SwhBaseURL']),
+      'content' => trim($sysconfig['SwhContent']),
+      'maxtime' => intval($sysconfig['SwhSleep']),
+      'token' => trim($sysconfig['SwhToken'])
+    ];
   }
 
   /**
@@ -250,7 +246,7 @@ class AjaxSHDetailsBrowser extends DefaultPlugin
     $fileName = htmlspecialchars($child['ufile_name']);
     if ($isContainer) {
       $fileName = "<a href='$linkUri'><span style='color: darkblue'> <b>$fileName</b> </span></a>";
-    } else if (!empty($linkUri)) {
+    } else if (! empty($linkUri)) {
       $fileName = "<a href='$linkUri'>$fileName</a>";
     }
 
@@ -260,7 +256,9 @@ class AjaxSHDetailsBrowser extends DefaultPlugin
 
     if (! $isContainer) {
       $text = _("Software Heritage");
-      $shLink = $this->configuration['api']['url'].$this->configuration['api']['uri'].$pfileHash["sha256"].$this->configuration['api']['content'];
+      $shLink = $this->configuration['url'] .
+        $this->configuration['uri'] . strtolower($pfileHash["sha256"]) .
+        $this->configuration['content'];
       $fileListLinks .= "[<a href='".$shLink."' target=\"_blank\">$text</a>]";
     }
     $img = "";

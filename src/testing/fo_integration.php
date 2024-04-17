@@ -1,20 +1,9 @@
 <?php
 /*
- Copyright (C) 2011 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2011 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  *
@@ -59,16 +48,15 @@ class FoIntegration
     if(is_NULL($logPath))
     {
       $this->logPath = getcwd() . "/fo_integration.log";
-      echo "DB: logpath is:$this->logPath\n";
     }
     else
     {
       $this->logPath = $logPath;
-      echo "DB: logpath is:$this->logPath\n";
     }
+    echo "DB: logpath is:$this->logPath\n";
 
     $this->LOGFD = fopen($this->logPath, 'a+');
-    if($this->LOGFD === FALSE)
+    if($this->LOGFD === false)
     {
       $error = "Error! cannot open $this->logPath" . " File: " . __FILE__ .
         " on line: " . __LINE__;
@@ -89,13 +77,13 @@ class FoIntegration
    */
   protected function log($message)
   {
-    if(fwrite($this->LOGFD, $message) === FALSE)
+    if(fwrite($this->LOGFD, $message) === false)
     {
       // remove the warning? and have caller do it?
       echo "WARNING! cannot write to log file, there may be no log messages\n";
-      return(FALSE);
+      return false;
     }
-    return(TRUE);
+    return true;
   } // log
 
 } //fo_integration
@@ -161,4 +149,3 @@ class Build extends FoIntegration
   } // makeFossology
 
 } // build
-?>

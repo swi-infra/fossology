@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- * Copyright (C) 2015 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Page;
 
@@ -44,6 +33,8 @@ abstract class UploadPageBase extends DefaultPlugin
   private $uploadDao;
   /** @var Logger */
   private $logger;
+  /** @var UserDao */
+  private $userDao;
 
   public function __construct($name, $parameters = array())
   {
@@ -52,6 +43,7 @@ abstract class UploadPageBase extends DefaultPlugin
     $this->folderDao = $this->getObject('dao.folder');
     $this->uploadDao = $this->getObject('dao.upload');
     $this->logger = $this->getObject('logger');
+    $this->userDao = $this->getObject('dao.user');
   }
   abstract protected function handleUpload(Request $request);
   abstract protected function handleView(Request $request, $vars);
@@ -72,8 +64,18 @@ abstract class UploadPageBase extends DefaultPlugin
     $vars['folderParameterName'] = self::FOLDER_PARAMETER_NAME;
     $vars['upload_max_filesize'] = ini_get('upload_max_filesize');
     $vars['agentCheckBoxMake'] = '';
-
-    $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    global $SysConf;
+    $userId = Auth::getUserId();
+    $UserRec = $this->userDao->getUserByPk($userId);
+    if (!empty($UserRec['upload_visibility'])) {
+      $vars['uploadVisibility'] = $UserRec['upload_visibility'];
+    } else {
+      $vars['uploadVisibility'] = $SysConf['SYSCONFIG']['UploadVisibility'];
+    }
+    $rootFolder = $this->folderDao->getDefaultFolder(Auth::getUserId());
+    if ($rootFolder == NULL) {
+      $rootFolder = $this->folderDao->getRootFolder(Auth::getUserId());
+    }
     $folderStructure = $this->folderDao->getFolderStructure($rootFolder->getId());
 
     $vars['folderStructure'] = $folderStructure;

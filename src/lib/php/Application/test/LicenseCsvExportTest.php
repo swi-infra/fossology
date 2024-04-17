@@ -1,24 +1,14 @@
 <?php
 /*
-Copyright (C) 2015, Siemens AG
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Application;
 
 use Fossology\Lib\BusinessRules\LicenseMap;
+use Fossology\Lib\Data\LicenseRef;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Test\TestPgDb;
 use Mockery as M;
@@ -33,7 +23,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
    * @brief One time setup for test
    * @see PHPUnit::Framework::TestCase::setUp()
    */
-  protected function setUp()
+  protected function setUp() : void
   {
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
   }
@@ -42,7 +32,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
    * @brief Close mockery
    * @see PHPUnit::Framework::TestCase::tearDown()
    */
-  protected function tearDown()
+  protected function tearDown() : void
   {
     $this->addToAssertionCount(\Hamcrest\MatcherAssert::getCount()-$this->assertCountBefore);
     M::close();
@@ -59,7 +49,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
   public function testCreateCsv()
   {
     $testDb = new TestPgDb("licenseCsvExport");
-    $testDb->createPlainTables(array('license_ref','license_map','groups'));
+    $testDb->createPlainTables(array('license_ref','license_map','groups','obligation_ref','obligation_map'));
     $testDb->createInheritedTables(array('license_candidate'));
     $dbManager = $testDb->getDbManager();
     $licenses = array();
@@ -71,6 +61,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       $licenses[$i] = array(
         'rf_pk' => $i,
         'rf_shortname' => 'lic' . $i,
+        'rf_spdx_id' => 'lrf-lic' . $i,
         'rf_fullname' => 'lice' . $i,
         'rf_text' => 'text' . $i,
         'rf_url' => $i . $i,
@@ -86,6 +77,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         'rf_pk' => $i + 4,
         'rf_shortname' => 'candlic' . $i,
         'rf_fullname' => 'candlice' . $i,
+        'rf_spdx_id' => null,
         'rf_text' => 'text' . $i,
         'rf_url' => $i . $i,
         'rf_notes' => 'note' . $i,
@@ -105,7 +97,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
     $dbManager->insertTableRow('license_map', array('rf_fk'=>3,'rf_parent'=>2,'usage'=>LicenseMap::REPORT));
 
     $licenseCsvExport = new LicenseCsvExport($dbManager);
-    $head = array('shortname','fullname','text','parent_shortname','report_shortname','url','notes','source','risk','group');
+    $head = array('shortname','fullname', 'spdx_id','text','parent_shortname','report_shortname','url','notes','source','risk','group', 'obligations');
     $out = fopen('php://output', 'w');
 
     $csv = $licenseCsvExport->createCsv();
@@ -113,6 +105,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
     fputcsv($out, $head);
     fputcsv($out, array($licenses[1]['rf_shortname'],
         $licenses[1]['rf_fullname'],
+        $licenses[1]['rf_spdx_id'],
         $licenses[1]['rf_text'],
         null,
         null,
@@ -120,10 +113,11 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         $licenses[1]['rf_notes'],
         $licenses[1]['rf_source'],
         $licenses[1]['rf_risk'],
-        null));
+        null, null));
 
     fputcsv($out, array($licenses[2]['rf_shortname'],
         $licenses[2]['rf_fullname'],
+        $licenses[2]['rf_spdx_id'],
         $licenses[2]['rf_text'],
         null,
         null,
@@ -131,10 +125,11 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         $licenses[2]['rf_notes'],
         $licenses[2]['rf_source'],
         $licenses[2]['rf_risk'],
-        null));
+        null, null));
 
     fputcsv($out, array($licenses[3]['rf_shortname'],
         $licenses[3]['rf_fullname'],
+        $licenses[3]['rf_spdx_id'],
         $licenses[3]['rf_text'],
         $licenses[1]['rf_shortname'],
         $licenses[2]['rf_shortname'],
@@ -142,10 +137,11 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
         $licenses[3]['rf_notes'],
         $licenses[3]['rf_source'],
         $licenses[3]['rf_risk'],
-        null));
+        null, null));
 
     fputcsv($out, array($candLicenses[2]['rf_shortname'],
       $candLicenses[2]['rf_fullname'],
+      LicenseRef::convertToSpdxId($candLicenses[2]['rf_shortname'], $candLicenses[2]['rf_spdx_id']),
       $candLicenses[2]['rf_text'],
       null,
       null,
@@ -153,10 +149,11 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       $candLicenses[2]['rf_notes'],
       $candLicenses[2]['rf_source'],
       $candLicenses[2]['rf_risk'],
-      "test"));
+      "test", null));
 
     fputcsv($out, array($candLicenses[4]['rf_shortname'],
       $candLicenses[4]['rf_fullname'],
+      LicenseRef::convertToSpdxId($candLicenses[4]['rf_shortname'], $candLicenses[4]['rf_spdx_id']),
       $candLicenses[4]['rf_text'],
       null,
       null,
@@ -164,7 +161,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
       $candLicenses[4]['rf_notes'],
       $candLicenses[4]['rf_source'],
       $candLicenses[4]['rf_risk'],
-      "test"));
+      "test", null));
     $expected = ob_get_contents();
     ob_end_clean();
 
@@ -177,6 +174,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
     fputcsv($out, $head, $delimiter);
     fputcsv($out, array($licenses[3]['rf_shortname'],
           $licenses[3]['rf_fullname'],
+          $licenses[3]['rf_spdx_id'],
           $licenses[3]['rf_text'],
           $licenses[1]['rf_shortname'],
           $licenses[2]['rf_shortname'],
@@ -184,7 +182,7 @@ class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
           $licenses[3]['rf_notes'],
           $licenses[3]['rf_source'],
           $licenses[3]['rf_risk'],
-          null
+          null, null
         ),
         $delimiter);
     $expected3 = ob_get_contents();

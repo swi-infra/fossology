@@ -1,19 +1,8 @@
 <?php
 /*
-Copyright (C) 2014-2017, Siemens AG
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Application;
@@ -173,15 +162,14 @@ class ObligationCsvImport
    * @param array $listFromCsv List of obligations from CSV
    * @param bool $candidate    Is a candidate obligation?
    * @param array $row         Unused
-   * @return number strcmp() diff
+   * @return int strcmp() diff
    */
   private function compareLicList($exists, $listFromCsv, $candidate, $row)
   {
     $getList = $this->obligationMap->getLicenseList($exists, $candidate);
     $listFromDb = $this->reArrangeString($getList);
     $listFromCsv = $this->reArrangeString($listFromCsv);
-    $diff = strcmp($listFromDb, $listFromCsv);
-    return $diff;
+    return strcmp($listFromDb, $listFromCsv);
   }
 
   /**
@@ -194,8 +182,7 @@ class ObligationCsvImport
   {
     $string = explode(";", $string);
     sort($string);
-    $string = implode(",", $string);
-    return $string;
+    return implode(",", $string);
   }
 
   /**

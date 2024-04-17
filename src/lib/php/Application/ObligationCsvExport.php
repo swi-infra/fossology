@@ -1,24 +1,12 @@
 <?php
 /*
-Copyright (C) 2017, Siemens AG
+ SPDX-FileCopyrightText: © 2017 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Application;
 
-use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\Db\DbManager;
 
 /**
@@ -72,25 +60,24 @@ class ObligationCsvExport
 
   /**
    * @brief Create CSV from the obligations
-   * @param int $rf Obligation id to be returned, else set 0 to get all.
+   * @param int $ob Obligation id to be returned, else set 0 to get all.
    * @return string CSV
    */
   public function createCsv($ob=0)
   {
     $csvarray = array();
     $sql = "SELECT ob_pk,ob_type,ob_topic,ob_text,ob_classification,ob_modifications,ob_comment
-            FROM obligation_ref;";
+            FROM obligation_ref";
     if ($ob>0) {
       $stmt = __METHOD__.'.ob';
-      $sql .= ' WHERE ob_pk=$'.$ob;
-      $row = $this->dbManager->getSingleRow($sql,$stmt);
-      $vars = $row ? array( $row ) : array();
+      $sql .= ' WHERE ob_pk=$1;';
+      $row = $this->dbManager->getSingleRow($sql, [$ob], $stmt);
       $liclist = $this->obligationMap->getLicenseList($ob);
       $candidatelist = $this->obligationMap->getLicenseList($ob, True);
-      array_shift($vars);
-      array_push($vars,$liclist);
-      array_push($vars,$candidatelist);
-      $csvarray = $vars;
+      array_shift($row);
+      $row[] = $liclist;
+      $row[] = $candidatelist;
+      $csvarray[] = $row;
     } else {
       $stmt = __METHOD__;
       $this->dbManager->prepare($stmt,$sql);
@@ -102,9 +89,9 @@ class ObligationCsvExport
         $liclist = $this->obligationMap->getLicenseList($row['ob_pk']);
         $candidatelist = $this->obligationMap->getLicenseList($row['ob_pk'], True);
         array_shift($row);
-        array_push($row,$liclist);
-        array_push($row,$candidatelist);
-        array_push($csvarray,$row);
+        $row[] = $liclist;
+        $row[] = $candidatelist;
+        $csvarray[] = $row;
       }
     }
 

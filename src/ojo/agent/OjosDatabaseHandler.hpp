@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Database handler for OJO
@@ -79,19 +68,23 @@ class OjosDatabaseHandler: public fo::AgentDatabaseHandler
     ;
     OjosDatabaseHandler spawn() const;
 
-    std::vector<unsigned long> queryFileIdsForUpload(int uploadId);
-    std::vector<unsigned long> queryFileIdsForScan(int uploadId, int agentId);
+    std::vector<unsigned long> queryFileIdsForUpload(int uploadId, int agentId,
+                                                     bool ignoreFilesWithMimeType);
     unsigned long saveLicenseToDatabase(OjoDatabaseEntry &entry) const;
     bool insertNoResultInDatabase(OjoDatabaseEntry &entry) const;
     bool saveHighlightToDatabase(const ojomatch &match,
       const unsigned long fl_fk) const;
 
-    unsigned long getLicenseIdForName(std::string const &rfShortName);
+    unsigned long getLicenseIdForName(std::string const &rfShortName,
+                                      const int groupId,
+                                      const int userId);
 
   private:
-    unsigned long getCachedLicenseIdForName(
+    unsigned long getCachedLicenseIdForName (
       std::string const &rfShortName) const;
-    unsigned long selectOrInsertLicenseIdForName(std::string rfShortname);
+    unsigned long selectOrInsertLicenseIdForName (std::string rfShortname,
+                                                  const int groupId,
+                                                  const int userId);
     /**
      * Cached license pairs
      */

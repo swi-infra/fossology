@@ -1,22 +1,11 @@
 #!/usr/bin/env php
 <?php
-/***********************************************************
- Copyright (C) 2019 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2019 Siemens AG
  Author: Gaurav Mishra <mishra.gaurav@siemens.com>
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Db\DbManager;
 
@@ -38,7 +27,7 @@ require_once 'fossinit-common.php';
 function checkCorrectUser()
 {
   $processUser = posix_getpwuid(posix_geteuid());
-  if ($processUser['uid'] !== 0 && $processUser['name'] != "{$PROJECTUSER}") {
+  if ($processUser['uid'] !== 0 && $processUser['name'] != "@FO_PROJECTUSER@") {
     return false;
   }
   return true;
@@ -59,7 +48,7 @@ function explainPfileUsage()
 
 /* Condition must be satisfied */
 if (!checkCorrectUser()) {
-  echo "Error: " . basename($argv[0]) . " must either run by root or {$PROJECTUSER} " .
+  echo "Error: " . basename($argv[0]) . " must either run by root or @FO_PROJECTUSER@ " .
     "user!\n";
   exit(-2);
 }
@@ -71,7 +60,7 @@ $AllPossibleOpts = "abc:d:efghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 
 /* defaults */
 $DatabaseName = "fossology";
-$sysconfdir = "{$SYSCONFDIR}";
+$sysconfdir = "@FO_SYSCONFDIR@";
 $force = true;
 
 /* command-line options */

@@ -1,20 +1,9 @@
 <?php
-/***************************************************************
-Copyright (C) 2017 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2017 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * @file
@@ -25,16 +14,20 @@ namespace Fossology\UI\Api\Helper;
 require_once dirname(dirname(dirname(dirname(__DIR__)))) .
   "/lib/php/common-db.php";
 
+use Fossology\Lib\Auth\Auth;
+use Fossology\Lib\Dao\FolderDao;
+use Fossology\Lib\Dao\UploadDao;
+use Fossology\Lib\Data\Folder\Folder;
+use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Db\ModernDbManager;
 use Fossology\Lib\Exceptions\DuplicateTokenKeyException;
 use Fossology\Lib\Exceptions\DuplicateTokenNameException;
-use Fossology\UI\Api\Models\User;
+use Fossology\Lib\Proxy\LicenseViewProxy;
+use Fossology\Lib\Proxy\UploadBrowseProxy;
+use Fossology\UI\Api\Models\Hash;
 use Fossology\UI\Api\Models\Job;
 use Fossology\UI\Api\Models\Upload;
-use Fossology\UI\Api\Models\InfoType;
-use Fossology\UI\Api\Models\Info;
-use Fossology\Lib\Db\DbManager;
-use Fossology\Lib\Auth\Auth;
+use Fossology\UI\Api\Models\User;
 
 /**
  * @class DbHelper
@@ -49,13 +42,30 @@ class DbHelper
   private $dbManager;
 
   /**
+   * @var FolderDao $folderDao
+   * FolderDao object
+   */
+  private $folderDao;
+
+  /**
+   * @var UploadDao $uploadDao
+   * UploadDao object
+   */
+  private $uploadDao;
+
+  /**
    * DbHelper constructor.
    *
    * @param DbManager $dbManager DB manager in use
+   * @param FolderDao $folderDao Folder Dao to use
+   * @param UploadDao $uploadDao Upload Dao to use
    */
-  public function __construct(DbManager $dbManager)
+  public function __construct(DbManager $dbManager, FolderDao $folderDao,
+    UploadDao $uploadDao)
   {
     $this->dbManager = $dbManager;
+    $this->folderDao = $folderDao;
+    $this->uploadDao = $uploadDao;
   }
 
   /**
@@ -74,46 +84,122 @@ class DbHelper
    * Get a single upload information under the given user and upload id.
    *
    * @param integer $userId   User to check
+   * @param integer $groupId  Group trying to access
+   * @param integer $limit    Max number of results
+   * @param integer $page     Page to get
    * @param integer $uploadId Pass the upload id to check for single upload.
-   * @return Upload[][] Uploads as an associative array
+   * @param integer $options  Filter options
+   * @param bool $recursive   True to recursive listing of uploads
+   * @return array Total pages as first value, uploads as an array in second
+   *         value
    */
-  public function getUploads($userId, $uploadId = null)
+  public function getUploads($userId, $groupId, $limit, $page = 1,
+    $uploadId = null, $options = null, $recursive = true)
   {
-    if ($uploadId == null) {
-      $sql = "SELECT
-upload.upload_pk, upload.upload_desc, upload.upload_ts, upload.upload_filename,
-folder.folder_pk, folder.folder_name, pfile.pfile_size
-FROM upload
-INNER JOIN folderlist ON folderlist.upload_pk = upload.upload_pk
-INNER JOIN folder ON folder.folder_pk = folderlist.parent
-INNER JOIN pfile ON pfile.pfile_pk = upload.pfile_fk
-WHERE upload.user_fk = $1
-ORDER BY upload.upload_pk;";
-      $statementName = __METHOD__ . ".getAllUploads";
-      $params = [$userId];
-    } else {
-      $sql = "SELECT
-upload.upload_pk, upload.upload_desc, upload.upload_ts, upload.upload_filename,
-folder.folder_pk, folder.folder_name, pfile.pfile_size
-FROM upload
-INNER JOIN folderlist ON folderlist.upload_pk = upload.upload_pk
-INNER JOIN folder ON folder.folder_pk = folderlist.parent
-INNER JOIN pfile ON pfile.pfile_pk = upload.pfile_fk
-WHERE upload.user_fk = $1
-AND upload.upload_pk = $2
-ORDER BY upload.upload_pk;";
-      $statementName = __METHOD__ . ".getSpecificUpload";
-      $params = [$userId,$uploadId];
+    $uploadProxy = new UploadBrowseProxy($groupId, 0, $this->dbManager);
+    $folderId = $options["folderId"];
+    if ($folderId === null) {
+      $users = $this->getUsers($userId);
+      $folderId = $users[0]->getRootFolderId();
     }
-    $result = $this->dbManager->getRows($sql, $params, $statementName);
+    $folders = [$folderId];
+
+    if ($uploadId !== null) {
+      $recursive = true;
+      $users = $this->getUsers($userId);
+      $folderId = $users[0]->getRootFolderId();
+      $folders = [$folderId];
+    }
+
+    if ($recursive) {
+      $tree = $this->folderDao->getFolderStructure($folderId);
+      $folders = array_map(function ($folder) {
+        return $folder[$this->folderDao::FOLDER_KEY]->getId();
+      }, $tree);
+    }
+
+    $params = [$folders];
+    $partialQuery = $uploadProxy->getFolderPartialQuery($params);
+
+    $where = "";
+    $statementCount = __METHOD__ . ".countAllUploads";
+    $statementGet = __METHOD__ . ".getAllUploads.$limit";
+    if ($uploadId !== null) {
+      $params[] = $uploadId;
+      $where .= " AND upload.upload_pk = $" . count($params);
+      $statementGet .= ".upload";
+      $statementCount .= ".upload";
+    }
+    if (! empty($options["name"])) {
+      $params[] = strtolower("%" . $options["name"] . "%");
+      $where .= " AND (LOWER(upload_desc) LIKE $" . count($params) .
+        " OR LOWER(ufile_name) LIKE $" . count($params) .
+        " OR LOWER(upload_filename) LIKE $" . count($params) . ")";
+      $statementGet .= ".name";
+      $statementCount .= ".name";
+    }
+    if (! empty($options["status"])) {
+      $params[] = $options["status"];
+      $where .= " AND status_fk = $" . count($params);
+      $statementGet .= ".stat";
+      $statementCount .= ".stat";
+    }
+    if (! empty($options["assignee"])) {
+      $params[] = $options["assignee"];
+      $where .= " AND assignee = $" . count($params);
+      $statementGet .= ".assi";
+      $statementCount .= ".assi";
+    }
+    if (! empty($options["since"])) {
+      $params[] = $options["since"];
+      $where .= " AND upload_ts >= to_timestamp($" . count($params) . ")";
+      $statementGet .= ".since";
+      $statementCount .= ".since";
+    }
+    $sql = "SELECT count(*) AS cnt FROM $partialQuery $where;";
+    $totalResult = $this->dbManager->getSingleRow($sql, $params, $statementCount);
+    $totalResult = intval($totalResult['cnt']);
+    $totalResult = intval(ceil($totalResult / $limit));
+
+    $params[] = ($page - 1) * $limit;
+
+    $sql = "SELECT
+upload.upload_pk, upload.upload_desc, upload.upload_ts, upload.upload_filename, upload_clearing.assignee
+FROM $partialQuery $where ORDER BY upload_pk ASC LIMIT $limit OFFSET $" .
+      count($params) . ";";
+    $results = $this->dbManager->getRows($sql, $params, $statementGet);
     $uploads = [];
-    foreach ($result as $row) {
-      $upload = new Upload($row["folder_pk"], $row["folder_name"],
-        $row["upload_pk"], $row["upload_desc"], $row["upload_filename"],
-        $row["upload_ts"], $row["pfile_size"]);
-      array_push($uploads, $upload->getArray());
+    foreach ($results as $row) {
+      $uploadId = $row["upload_pk"];
+      $pfile_size = null;
+      $pfile_sha1 = null;
+      $pfile_md5 = null;
+      $pfile_sha256 = null;
+      $pfile = $this->getPfileInfoForUpload($uploadId);
+      if ($pfile !== null) {
+        $pfile_size = $pfile['pfile_size'];
+        $pfile_sha1 = $pfile['pfile_sha1'];
+        $pfile_md5 = $pfile['pfile_md5'];
+        $pfile_sha256 = $pfile['pfile_sha256'];
+      }
+
+      $folder = $this->getFolderForUpload($uploadId);
+      if ($folder === null) {
+        continue;
+      }
+      $folderId = $folder->getId();
+      $folderName = $folder->getName();
+
+      $hash = new Hash($pfile_sha1, $pfile_md5, $pfile_sha256, $pfile_size);
+      $upload = new Upload($folderId, $folderName, $uploadId,
+        $row["upload_desc"], $row["upload_filename"], $row["upload_ts"], $row["assignee"], $hash);
+      if (! empty($row["assignee"]) && $row["assignee"] != 1) {
+        $upload->setAssigneeDate($this->uploadDao->getAssigneeDate($uploadId));
+      }
+      $upload->setClosingDate($this->uploadDao->getClosedDate($uploadId));
+      $uploads[] = $upload->getArray();
     }
-    return $uploads;
+    return [$totalResult, $uploads];
   }
 
   /**
@@ -125,8 +211,8 @@ ORDER BY upload.upload_pk;";
   public function getFilenameFromUploadTree($uploadTreePk)
   {
     return $this->dbManager->getSingleRow(
-      'SELECT DISTINCT ufile_name FROM uploadtree
-WHERE uploadtree_pk=' . pg_escape_string($uploadTreePk))["ufile_name"];
+      "SELECT DISTINCT ufile_name FROM uploadtree
+WHERE uploadtree_pk=$1", [$uploadTreePk])["ufile_name"];
   }
 
   /**
@@ -140,7 +226,8 @@ WHERE uploadtree_pk=' . pg_escape_string($uploadTreePk))["ufile_name"];
   public function doesIdExist($tableName, $idRowName, $id)
   {
     return (0 < (intval($this->getDbManager()->getSingleRow("SELECT COUNT(*)
-FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
+FROM $tableName WHERE $idRowName = $1", [$id],
+      __METHOD__ . $tableName . $idRowName)["count"])));
   }
 
   /**
@@ -159,26 +246,25 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
    *
    * @param integer $id User id of the required user, or NULL to fetch all
    *        users.
-   * @return User[][] Users as an associative array
+   * @return User[] Users as an associative array
    */
   public function getUsers($id = null)
   {
     if ($id == null) {
       $usersSQL = "SELECT user_pk, user_name, user_desc, user_email,
-                  email_notify, root_folder_fk, user_perm, user_agent_list FROM users;";
+                  email_notify, root_folder_fk, group_fk, user_perm, user_agent_list, default_bucketpool_fk FROM users;";
       $statement = __METHOD__ . ".getAllUsers";
     } else {
       $usersSQL = "SELECT user_pk, user_name, user_desc, user_email,
-                email_notify, root_folder_fk, user_perm, user_agent_list FROM users
+                email_notify, root_folder_fk, group_fk, user_perm, user_agent_list, default_bucketpool_fk FROM users
                 WHERE user_pk = $1;";
       $statement = __METHOD__ . ".getSpecificUser";
     }
     $users = [];
     if ($id === null) {
-      $result = $result = $this->dbManager->getRows($usersSQL, [], $statement);
+      $result = $this->dbManager->getRows($usersSQL, [], $statement);
     } else {
-      $result = $result = $this->dbManager->getRows($usersSQL, [$id],
-        $statement);
+      $result = $this->dbManager->getRows($usersSQL, [$id], $statement);
     }
     $currentUser = Auth::getUserId();
     $userIsAdmin = Auth::isAdmin();
@@ -188,12 +274,12 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
         ($row["user_pk"] == $currentUser)) {
         $user = new User($row["user_pk"], $row["user_name"], $row["user_desc"],
           $row["user_email"], $row["user_perm"], $row["root_folder_fk"],
-          $row["email_notify"], $row["user_agent_list"]);
+          $row["email_notify"], $row["user_agent_list"], $row["group_fk"], $row["default_bucketpool_fk"]);
       } else {
         $user = new User($row["user_pk"], $row["user_name"], $row["user_desc"],
-          null, null, null, null, null);
+          null, null, null, null, null, null);
       }
-      $users[] = $user->getArray();
+      $users[] = $user;
     }
 
     return $users;
@@ -250,7 +336,78 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
       $params[] = $offset;
       $pagination .= " OFFSET $" . count($params);
       $statement .= ".withLimit";
-      $totalResult = floor($totalResult / $limit) + 1;
+      $totalResult = ceil($totalResult / $limit);
+    } else {
+      $totalResult = 1;
+    }
+
+    $jobs = [];
+    $result = $this->dbManager->getRows("$jobSQL $filter $pagination;", $params,
+      $statement);
+    foreach ($result as $row) {
+      $job = new Job($row["job_pk"]);
+      $job->setName($row["job_name"]);
+      $job->setQueueDate($row["job_queued"]);
+      $job->setUploadId($row["job_upload_fk"]);
+      $job->setUserId($row["job_user_fk"]);
+      $job->setGroupId($row["job_group_fk"]);
+      $jobs[] = $job;
+    }
+    return [$jobs, $totalResult];
+  }
+
+  /**
+   * @brief Get the recent jobs created by an user.
+   *
+   * If a limit is passed, the results are trimmed. If an ID is passed, the
+   * information for the given id is only retrieved.
+   *
+   * @param integer $id       Set to get information of only given job id
+   * @param integer $uid      Set to get information of only given user's ID
+   * @param integer $limit    Set to limit the result length
+   * @param integer $page     Page number required
+   * @param integer $uploadId Upload ID to be filtered
+   * @return array[] List of jobs at first index and total number of pages at
+   *         second.
+   */
+  public function getUserJobs($id = null, $uid=null, $limit = 0, $page = 1, $uploadId = null)
+  {
+    $jobSQL = "SELECT job_pk, job_queued, job_name, job_upload_fk," .
+      " job_user_fk, job_group_fk FROM job WHERE job_user_fk=$1";
+    $totalJobSql = "SELECT count(*) AS cnt FROM job WHERE job_user_fk=$1";
+    $filter = "";
+    $pagination = "";
+    $params = [];
+    $params[] = $uid;
+    $statement = __METHOD__ . ".getUserJobs";
+    $countStatement = __METHOD__ . ".getJobCount";
+    if ($id == null) {
+      if ($uploadId !== null) {
+        $params[] = $uploadId;
+        $filter = "WHERE job_upload_fk = $" . count($params);
+        $statement .= ".withUploadFilter";
+        $countStatement .= ".withUploadFilter";
+      }
+    } else {
+      $params[] = $id;
+      $filter = "WHERE job_pk = $" . count($params);
+      $statement .= ".withJobFilter";
+      $countStatement .= ".withJobFilter";
+    }
+
+    $result = $this->dbManager->getSingleRow("$totalJobSql $filter;", $params,
+      $countStatement);
+
+    $totalResult = $result['cnt'];
+
+    $offset = ($page - 1) * $limit;
+    if ($limit > 0) {
+      $params[] = $limit;
+      $pagination = "LIMIT $" . count($params);
+      $params[] = $offset;
+      $pagination .= " OFFSET $" . count($params);
+      $statement .= ".withLimit";
+      $totalResult = ceil($totalResult / $limit);
     } else {
       $totalResult = 1;
     }
@@ -279,7 +436,7 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
    */
   public function getTokenKey($tokenId)
   {
-    $sql = "SELECT token_key, created_on, expire_on, user_fk, active, token_scope " .
+    $sql = "SELECT token_key, client_id, created_on, expire_on, user_fk, active, token_scope " .
       "FROM personal_access_tokens WHERE pat_pk = $1;";
     return $this->dbManager->getSingleRow($sql, [$tokenId],
       __METHOD__ . ".getTokenSecret");
@@ -327,6 +484,24 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
     return $this->dbManager->getSingleRow($sql, [
       $userId, $expire, $scope, $name, $key
     ], __METHOD__ . ".insertNewToken");
+  }
+
+  /**
+   * Adds new oauth client to the user.
+   *
+   * @param string  $name     Name of the new client
+   * @param integer $userId   User PK
+   * @param string  $clientId New client ID
+   * @param string  $scope    Token scope
+   */
+  public function addNewClient($name, $userId, $clientId, $scope)
+  {
+    $sql = "INSERT INTO personal_access_tokens" .
+      "(user_fk, created_on, token_scope, token_name, client_id, active)" .
+      "VALUES ($1, NOW(), $2, $3, $4, true);";
+    $this->dbManager->getSingleRow($sql, [
+      $userId, $scope, $name, $clientId
+    ], __METHOD__);
   }
 
   /**
@@ -386,5 +561,116 @@ FROM $tableName WHERE $idRowName= " . pg_escape_string($id))["count"])));
       $validity = intval($result['conf_value']);
     }
     return $validity;
+  }
+
+  /**
+   * Get all info from pfile for given upload
+   * @param integer $uploadId Upload to get info for
+   * @return array|NULL Array of pfile if upload found, null otherwise
+   */
+  public function getPfileInfoForUpload($uploadId)
+  {
+    $sql = "SELECT pfile.* FROM upload INNER JOIN pfile " .
+      "ON pfile_fk = pfile_pk WHERE upload_pk = $1;";
+    $result = $this->dbManager->getSingleRow($sql, [$uploadId],
+      __METHOD__ . ".getPfileFromUpload");
+    if (! empty($result)) {
+      return $result;
+    }
+    return null;
+  }
+
+  /**
+   * Get the folder for given upload
+   * @param integer $uploadId Upload to get folder for
+   * @return Folder|null Folder object if found, null otherwise
+   */
+  private function getFolderForUpload($uploadId)
+  {
+    $contentId = $this->folderDao->getFolderContentsId($uploadId,
+      $this->folderDao::MODE_UPLOAD);
+    $content = $this->folderDao->getContent($contentId);
+    return $this->folderDao->getFolder($content['parent_fk']);
+  }
+
+  /**
+   * Get the licenses from database in paginated way
+   *
+   * @param integer $page    Which page number to fetch
+   * @param integer $limit   Limit of results
+   * @param string  $kind    Which kind of licenses to fetch
+   * @param integer $groupId Group of the user
+   * @param boolean $active  True to get only active licenses
+   * @return array
+   */
+  public function getLicensesPaginated($page, $limit, $kind, $groupId, $active)
+  {
+    $statementName = __METHOD__;
+    $rfTable = 'license_all';
+    $options = ['columns' => ['rf_pk', 'rf_shortname', 'rf_fullname', 'rf_text',
+      'rf_url', 'rf_risk', 'group_fk']];
+    if ($active) {
+      $options['extraCondition'] = "rf_active = '" .
+        $this->dbManager->booleanToDb($active) . "'";
+    }
+    if ($kind == "candidate") {
+      $options['diff'] = true;
+    } elseif ($kind == "main") {
+      $groupId = 0;
+    }
+    $licenseViewDao = new LicenseViewProxy($groupId, $options, $rfTable);
+    $withCte = $licenseViewDao->asCTE();
+
+    return $this->dbManager->getRows($withCte .
+      " SELECT * FROM $rfTable ORDER BY LOWER(rf_shortname) " .
+      "LIMIT $1 OFFSET $2;",
+      [$limit, ($page - 1) * $limit], $statementName);
+  }
+
+  /**
+   * Get the count of licenses accessible by user based on group ID
+   *
+   * @param string  $kind    Which kind of licenses to look for
+   * @param integer $groupId Group of the user
+   * @return int Count of licenses
+   */
+  public function getLicenseCount($kind, $groupId)
+  {
+    $sql = "SELECT sum(cnt) AS total FROM (";
+    $mainLicSql = " SELECT count(*) AS cnt FROM ONLY license_ref ";
+    $candidateLicSql = " SELECT count(*) AS cnt FROM license_candidate WHERE group_fk = $1";
+    $params = [];
+
+    if ($kind == "main") {
+      $sql .= $mainLicSql;
+    } elseif ($kind == "candidate") {
+      $sql .= $candidateLicSql;
+      $params[] = $groupId;
+    } else {
+      $sql .= $mainLicSql . " UNION ALL " . $candidateLicSql;
+      $params[] = $groupId;
+    }
+    $sql .= ") as all_lic;";
+
+    $statement = __METHOD__ . ".getLicenseCount.$kind";
+    $result = $this->dbManager->getSingleRow($sql, $params, $statement);
+    return intval($result['total']);
+  }
+
+  /*
+   * Get the OAuth token ID from a client id
+   *
+   * @param string $clientId Client ID to get info for
+   * @return integer Token ID
+   */
+  public function getTokenIdFromClientId($clientId)
+  {
+    $sql = "SELECT pat_pk FROM personal_access_tokens " .
+      "WHERE client_id = $1;";
+    $result = $this->dbManager->getSingleRow($sql, [$clientId], __METHOD__);
+    if (!empty($result)) {
+      return $result['pat_pk'];
+    }
+    return null;
   }
 }

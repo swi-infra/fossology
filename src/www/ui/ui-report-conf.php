@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2019 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2019 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
@@ -24,6 +13,7 @@ use Fossology\Lib\Dao\ClearingDao;
 use Fossology\Lib\Dao\LicenseDao;
 use Fossology\Lib\Data\DecisionTypes;
 use Fossology\Lib\BusinessRules\LicenseMap;
+use Fossology\Lib\Data\Package\ComponentType;
 
 class ui_report_conf extends FO_Plugin
 {
@@ -55,39 +45,45 @@ class ui_report_conf extends FO_Plugin
    */
   private $mapDBColumns = array(
     "reviewedBy" => "ri_reviewed",
+    "department" => "ri_department",
     "reportRel" => "ri_report_rel",
     "community" => "ri_community",
     "component" => "ri_component",
     "version" => "ri_version",
     "relDate" => "ri_release_date",
     "sw360Link" => "ri_sw360_link",
+    "componentType" => "ri_component_type",
+    "componentId" => "ri_component_id",
     "footerNote" => "ri_footer",
     "generalAssesment" => "ri_general_assesment",
     "gaAdditional" => "ri_ga_additional",
-    "gaRisk" => "ri_ga_risk"
+    "gaRisk" => "ri_ga_risk",
+    "dependencyBinarySource" => "ri_depnotes",
+    "exportRestrictionText" => "ri_exportnotes",
+    "copyrightRestrictionText" => "ri_copyrightnotes"
   );
 
   /**
-   * @var checkBoxListUR $checkBoxListUR
+   * @var array $radioListUR
    */
-  private $checkBoxListUR = array(
-    "nonCritical",
-    "critical",
-    "noDependency",
-    "dependencySource",
-    "dependencyBinary",
-    "noExportRestriction",
-    "exportRestriction",
-    "noRestriction",
-    "restrictionForUse"
+  private $radioListUR = array(
+    "nonCritical" => "critical",
+    "critical" => "critical",
+    "noDependency" => "dependencySourceBinary",
+    "dependencySource" => "dependencySourceBinary",
+    "dependencyBinary" => "dependencySourceBinary",
+    "noExportRestriction" => "exportRestriction",
+    "exportRestriction" => "exportRestriction",
+    "noRestriction" => "restrictionForUse",
+    "restrictionForUse" => "restrictionForUse"
   );
 
   /**
-   * @var checkBoxListSPDX $checkBoxListSPDX
+   * @var array $checkBoxListSPDX
    */
   private $checkBoxListSPDX = array(
-    "spdxLicenseComment",
-    "ignoreFilesWOInfo"
+    "spdxLicenseComment" => "spdxLicenseComment",
+    "ignoreFilesWOInfo" => "ignoreFilesWOInfo"
   );
 
 
@@ -154,17 +150,31 @@ class ui_report_conf extends FO_Plugin
     foreach ($this->mapDBColumns as $key => $value) {
       $vars[$key] = $row[$value];
     }
+    $textAreaNoneStyle = ' style="display:none;overflow:auto;width:98%;height:80px;"';
+    $textAreaStyle = ' style="overflow:auto;width:98%;height:80px;"';
+    $vars['styleDependencyTA'] = $vars['styleExportTA'] = $vars['styleRestrictionTA'] = $textAreaStyle;
+    if ($row['ri_depnotes'] == 'NA' || empty($row['ri_depnotes'])) {
+       $vars['styleDependencyTA'] = $textAreaNoneStyle;
+    }
+
+    if ($row['ri_exportnotes'] == 'NA' || empty($row['ri_exportnotes'])) {
+       $vars['styleExportTA'] = $textAreaNoneStyle;
+    }
+
+    if ($row['ri_copyrightnotes'] == 'NA' || empty($row['ri_copyrightnotes'])) {
+       $vars['styleRestrictionTA'] = $textAreaNoneStyle;
+    }
 
     if (!empty($row['ri_ga_checkbox_selection'])) {
       $listURCheckbox = explode(',', $row['ri_ga_checkbox_selection']);
-      foreach ($this->checkBoxListUR as $key => $value) {
+      foreach (array_keys($this->radioListUR) as $key => $value) {
         $vars[$value] = $listURCheckbox[$key];
       }
     }
 
     if (!empty($row['ri_spdx_selection'])) {
       $listSPDXCheckbox = explode(',', $row['ri_spdx_selection']);
-      foreach ($this->checkBoxListSPDX as $key => $value) {
+      foreach (array_keys($this->checkBoxListSPDX) as $key => $value) {
         $vars[$value] = $listSPDXCheckbox[$key];
       }
     }
@@ -178,14 +188,59 @@ class ui_report_conf extends FO_Plugin
                      $obData['text'].'</textarea></td><td>';
       foreach ($obData['license'] as $value) {
         if (!empty($excludedObligations[$obTopic]) && in_array($value, $excludedObligations[$obTopic])) {
-          $tableRows .= '<input type="checkbox" name="obLicenses['.$obTopic.'][]" value="'.$value.'" checked> '.$value.'<br />';
+          $tableRows .= '<input class="browse-upload-checkbox view-license-rc-size" type="checkbox" name="obLicenses['.urlencode($obTopic).'][]" value="'.$value.'" checked> '.$value.'<br />';
         } else {
-          $tableRows .= '<input type="checkbox" name="obLicenses['.$obTopic.'][]" value="'.$value.'"> '.$value.'<br />';
+          $tableRows .= '<input class="browse-upload-checkbox view-license-rc-size" type="checkbox" name="obLicenses['.urlencode($obTopic).'][]" value="'.$value.'"> '.$value.'<br />';
         }
       }
       $tableRows .= '</td></tr>';
     }
+    $tableRowsUnifiedReport = "";
+    $unifiedColumns = array();
+    if (!empty($row['ri_unifiedcolumns'])) {
+      $unifiedColumns = (array) json_decode($row['ri_unifiedcolumns'], true);
+    } else {
+      $unifiedColumns = UploadDao::UNIFIED_REPORT_HEADINGS;
+    }
+    foreach ($unifiedColumns as $name => $unifiedReportColumns) {
+      foreach ($unifiedReportColumns as $columnName => $isenabled) {
+        $tableRowsUnifiedReport .= '<tr>';
+        $tableRowsUnifiedReport .= '<td><input class="form-control" type="text" style="width:95%" name="'.$name.'[]" value="'.$columnName.'"></td>';
+        $checked = '';
+        if ($isenabled) {
+          $checked = 'checked';
+        }
+        $tableRowsUnifiedReport .= '<td style="vertical-align:middle"><input class="browse-upload-checkbox view-license-rc-size" type="checkbox" style="width:95%" name="'.$name.'[]" '.$checked.'></td>';
+        $tableRowsUnifiedReport .= '</tr>';
+      }
+    }
+
+    $tableRowsClixmlReport = "";
+    $clixmlColumns = array();
+    if (!empty($row['ri_clixmlcolumns'])) {
+      $clixmlColumns = (array) json_decode($row['ri_clixmlcolumns'], true);
+    } else {
+      $clixmlColumns = UploadDao::CLIXML_REPORT_HEADINGS;
+    }
+    foreach ($clixmlColumns as $name => $clixmlReportColumns) {
+      foreach ($clixmlReportColumns as $columnName => $isenabled) {
+        $tableRowsClixmlReport .= '<tr>';
+        $tableRowsClixmlReport .= '<td><input class="form-control" type="text" style="width:95%" name="'.$name.'[]" value="'.$columnName.'" readonly></td>';
+        $checked = '';
+        if ($isenabled) {
+          $checked = 'checked';
+        }
+        $tableRowsClixmlReport .= '<td style="vertical-align:middle"><input class="browse-upload-checkbox view-license-rc-size" type="checkbox" style="width:95%" name="'.$name.'[]" '.$checked.'></td>';
+        $tableRowsClixmlReport .= '</tr>';
+      }
+    }
+
+    if (!empty($row['ri_globaldecision'])) {
+      $vars['applyGlobal'] = "checked";
+    }
     $vars['tableRows'] = $tableRows;
+    $vars['tableRowsUnifiedReport'] = $tableRowsUnifiedReport;
+    $vars['tableRowsClixmlReport'] = $tableRowsClixmlReport;
     $vars['scriptBlock'] = $this->createScriptBlock();
 
     return $vars;
@@ -216,8 +271,8 @@ class ui_report_conf extends FO_Plugin
         $allClearedLicenses[] = $licenseMap->getProjectedId($getLicenseId);
       }
     }
-    $obligationsForLicenses = $this->licenseDao->getLicenseObligations($allClearedLicenses, 'obligation_map') ?: array();
-    $obligationsForLicenseCandidates = $this->licenseDao->getLicenseObligations($allClearedLicenses, 'obligation_candidate_map') ?: array();
+    $obligationsForLicenses = $this->licenseDao->getLicenseObligations($allClearedLicenses) ?: array();
+    $obligationsForLicenseCandidates = $this->licenseDao->getLicenseObligations($allClearedLicenses, true) ?: array();
     $allObligations = array_merge($obligationsForLicenses, $obligationsForLicenseCandidates);
     $groupedObligations = array();
     foreach ($allObligations as $obligations) {
@@ -239,14 +294,14 @@ class ui_report_conf extends FO_Plugin
   }
 
   /**
-   * @param array $checkBoxListParams
-   * @return $cbSelectionList
+   * @param array $listParams
+   * @return string
    */
-  protected function getCheckBoxSelectionList($checkBoxListParams)
+  protected function getCheckBoxSelectionList($listParams)
   {
-    foreach ($checkBoxListParams as $checkBoxListParam) {
-      $ret = GetParm($checkBoxListParam, PARM_STRING);
-      if (empty($ret)) {
+    foreach ($listParams as $listkey => $listValue) {
+      $ret = GetParm($listValue, PARM_STRING);
+      if ($ret != $listkey) {
         $cbList[] = "unchecked";
       } else {
         $cbList[] = "checked";
@@ -261,36 +316,97 @@ class ui_report_conf extends FO_Plugin
   {
     $uploadId = GetParm("upload", PARM_INTEGER);
     $groupId = Auth::getGroupId();
+    $userId = Auth::getUserId();
     if (!$this->uploadDao->isAccessible($uploadId, $groupId)) {
       return;
     }
 
     $itemId = GetParm("item",PARM_INTEGER);
     $this->vars['micromenu'] = Dir2Browse("browse", $itemId, NULL, $showBox=0, "View-Meta");
+    $this->vars['globalClearingAvailable'] = Auth::isClearingAdmin();
 
     $submitReportConf = GetParm("submitReportConf", PARM_STRING);
 
     if (isset($submitReportConf)) {
+      $applyGlobal = @$_POST["applyGlobal"];
+      $applyGlobal = !empty($applyGlobal) ? 1 : 0;
       $parms = array();
-      $obLicenses = $_POST["obLicenses"];
+      $obLicensesEncoded = @$_POST["obLicenses"];
+      $obLicensesEncoded = !empty($obLicensesEncoded) ? $obLicensesEncoded : array();
+      $obLicenses = array();
+      array_walk($obLicensesEncoded,
+        function (&$licArray, $obTopic) use (&$obLicenses) {
+          $obLicenses[urldecode($obTopic)] = $licArray;
+        }
+      );
       $i = 1;
       $columns = "";
       foreach ($this->mapDBColumns as $key => $value) {
         $columns .= $value." = $".$i.", ";
-        $parms[] = GetParm($key, PARM_TEXT);
+        $parms[] = GetParm($key, PARM_RAW);
         $i++;
       }
-      $parms[] = $this->getCheckBoxSelectionList($this->checkBoxListUR);
+      $parms[] = $this->getCheckBoxSelectionList($this->radioListUR);
+
+      $unifiedReportColumnsForJson = array();
+      foreach (UploadDao::UNIFIED_REPORT_HEADINGS as $columnName => $columnValue) {
+        $columnResult = @$_POST[$columnName];
+        $unifiedReportColumnsForJson[$columnName] = array($columnResult[0] => isset($columnResult[1]) ? $columnResult[1] : null);
+      }
+      $clixmlColumnsForJson = array();
+      foreach (UploadDao::CLIXML_REPORT_HEADINGS as $columnName => $columnValue) {
+        $columnResult = @$_POST[$columnName];
+        $clixmlColumnsForJson[$columnName] = array($columnResult[0] => isset($columnResult[1]) ? $columnResult[1] : null);
+      }
+      $checkBoxUrPos = count($parms);
       $parms[] = $this->getCheckBoxSelectionList($this->checkBoxListSPDX);
+      $checkBoxSpdxPos = count($parms);
       $parms[] = json_encode($obLicenses);
+      $excludeObligationPos = count($parms);
+      $parms[] = json_encode($unifiedReportColumnsForJson);
+      $unifiedColumnsPos = count($parms);
+      $parms[] = json_encode($clixmlColumnsForJson);
+      $clixmlColumnsPos = count($parms);
+      $parms[] = $applyGlobal;
+      $applyGlobalPos = count($parms);
       $parms[] = $uploadId;
+      $uploadIdPos = count($parms);
 
       $SQL = "UPDATE report_info SET $columns" .
-               "ri_ga_checkbox_selection = $12, ri_spdx_selection = $13, ri_excluded_obligations = $14" .
-             "WHERE upload_fk = $15;";
-      $this->dbManager->getSingleRow($SQL, $parms, __METHOD__ . "updateReportInfoData");
+               "ri_ga_checkbox_selection = $$checkBoxUrPos, " .
+               "ri_spdx_selection = $$checkBoxSpdxPos, " .
+               "ri_excluded_obligations = $$excludeObligationPos, " .
+               "ri_unifiedcolumns = $$unifiedColumnsPos, " .
+               "ri_clixmlcolumns = $$clixmlColumnsPos, " .
+               "ri_globaldecision = $$applyGlobalPos " .
+               "WHERE upload_fk = $$uploadIdPos;";
+      $this->dbManager->getSingleRow($SQL, $parms,
+        __METHOD__ . "updateReportInfoData");
+
+      if (@$_POST['markGlobal']) {
+        $upload = $this->uploadDao->getUpload($uploadId);
+        $uploadName = $upload->getFilename();
+        $jobId = JobAddJob($userId, $groupId, $uploadName, $uploadId);
+        /** @var agent_fodecider $deciderPlugin */
+        $deciderPlugin = plugin_find("agent_deciderjob");
+        $conflictStrategyId = "global";
+        $errorMsg = "";
+        $deciderPlugin->AgentAdd($jobId, $uploadId, $errorMsg, array(), $conflictStrategyId);
+        $schedulerMsg = empty(GetRunnableJobList()) ? _("Is the scheduler running? ") : '';
+        $url = Traceback_uri() . "?mod=showjobs&upload=$uploadId";
+        $text = _("Your jobs have been added to job queue.");
+        $linkText = _("View Jobs");
+        $this->vars['message'] = "$schedulerMsg" . "$text <a href=\"$url\">$linkText</a>";
+      }
     }
     $this->vars += $this->allReportConfiguration($uploadId, $groupId);
+    $this->vars['typemap'] = [];
+    foreach (ComponentType::TYPE_MAP as $key => $name) {
+      if ($key == ComponentType::PACKAGEURL) {
+        continue;
+      }
+      $this->vars['typemap'][] = ['key' => $key, 'name' => $name];
+    }
   }
 
   public function getTemplateName()
@@ -316,6 +432,33 @@ class ui_report_conf extends FO_Plugin
           var idString = $(e.currentTarget).attr('id');
           idString = parseInt(idString.slice(-1)) - 1;
           $.cookie(reportTabCookie, idString);
+        }
+      });
+      $(\"input[name='dependencySourceBinary']\").change(function(){
+        var val = $(\"input[name='dependencySourceBinary']:checked\").val();
+        if (val == 'noDependency') {
+          $('#dependencyBinarySource').hide();
+          $('#dependencyBinarySource').val('');
+        } else {
+          $('#dependencyBinarySource').css('display', 'block');
+        }
+      });
+      $(\"input[name='exportRestriction']\").change(function(){
+        var val = $(\"input[name='exportRestriction']:checked\").val();
+        if (val == 'noExportRestriction') {
+          $('#exportRestrictionText').hide();
+          $('#exportRestrictionText').val('');
+        } else {
+          $('#exportRestrictionText').css('display', 'block');
+        }
+      });
+      $(\"input[name='restrictionForUse']\").change(function(){
+        var val = $(\"input[name='restrictionForUse']:checked\").val();
+        if (val == 'noRestriction') {
+          $('#copyrightRestrictionText').hide();
+          $('#copyrightRestrictionText').val('');
+        } else {
+          $('#copyrightRestrictionText').css('display', 'block');
         }
       });
     });

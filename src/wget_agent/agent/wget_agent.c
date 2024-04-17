@@ -1,22 +1,10 @@
-/***************************************************************
+/*
  wget_agent: Retrieve a file and put it in the database.
 
- Copyright (C) 2007-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2007-2014 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
- ***************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * \file wget_agent.c
@@ -73,7 +61,7 @@ void  SafeExit(int rc)
  * \brief Get the position (ending + 1) of http|https|ftp:// of one url
  * \param URL The URL
  * \return the position (ending + 1) of http|https|ftp:// of one url
- *         E.g. http://fossology.org, return 7
+ *         E.g. http://fossology.org return 7
  */
 int GetPosition(char *URL)
 {
@@ -99,60 +87,30 @@ void DBLoadGold()
   long PfileKey;
   char *Path;
   char SHA256[65];
-  char *cmd;
   FILE *Fin;
-  int rc = -1, i;
+  int rc = -1;
   PGresult *result;
-  int read = 0;
-  int res;
-
   memset(SHA256, '\0', sizeof(SHA256));
 
   LOG_VERBOSE0("Processing %s",GlobalTempFile);
   Fin = fopen(GlobalTempFile,"rb");
-
-  // Calculate sha256 value
-  res = asprintf(&cmd, "sha256sum '%s'", GlobalTempFile);
-  if (res == -1)
-  {
-    SafeExit(ASPRINTF_MEM_ERROR);
-  }
-
   if (!Fin)
   {
     LOG_FATAL("upload %ld Unable to open temp file %s from %s",
         GlobalUploadKey,GlobalTempFile,GlobalURL);
     SafeExit(1);
   }
-  
-  FILE* file = popen(cmd, "r");
 
-  if (!file)
-  {
-    LOG_FATAL("Unable to get SHA256 from command %s\n", cmd);
-    free(cmd);
-    SafeExit(56);
-  }
+  Sum = SumComputeFile(Fin);
+  fclose(Fin);
 
-  free(cmd);
-
-  read = fscanf(file, "%64s", SHA256);
-  rc = WEXITSTATUS(pclose(file));
-
-  if (rc || read != 1)
+  // Calculate sha256 value
+  rc = calc_sha256sum(GlobalTempFile, SHA256);
+  if (rc != 0)
   {
     LOG_FATAL("Unable to calculate SHA256 of %s\n", GlobalTempFile);
     SafeExit(56);
   }
-
-  // Change SHA256 to upper case like other checksums
-  for (i = 0; i < 65; i++)
-  {
-    SHA256[i] = toupper(SHA256[i]);
-  }
-
-  Sum = SumComputeFile(Fin);
-  fclose(Fin);
 
   if ((int)ForceGroup > 0)
   {
@@ -335,7 +293,7 @@ int TaintURL(char *Sin, char *Sout, int SoutSize)
  * \param TempFileDir
  * \param TempFileDirectory
  * \parblock
- * Internal helper function for function GetURL 
+ * Internal helper function for function GetURL
  * \endparblock
  * \return destination for wget download or NULL
  */
@@ -351,7 +309,7 @@ char *PrepareWgetDest(char *TempFile, char *TempFileDir, char *TempFileDirectory
   {
     return TempFileDir;
   }
-    
+
   return NULL;
 }
 
@@ -538,7 +496,7 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
           SafeExit(ASPRINTF_MEM_ERROR);
         }
       }
-      
+
       free(tmpfile_path);
 
       rc_system = system(cmd);
@@ -588,7 +546,7 @@ int GetURL(char *TempFile, char *URL, char *TempFileDir)
     free(delete_tmpdir_cmd);
     SafeExit(15);
   }
-  
+
   free(cmd);
 
   /* remove the temp dir /srv/fossology/repository/localhost/wget/wget.xxx.dir/ for this upload */
@@ -799,7 +757,7 @@ void    SetEnv  (char *S, char *TempFileDir)
     memset(GlobalType,'\0',STRMAX);
   }
 
-  strncpy(GlobalParam, S, sizeof(GlobalParam)); // get the parameters, kind of " -A rpm -R fosso -l 1* "
+  strncpy(GlobalParam, S, sizeof(GlobalParam) - 1); // get the parameters, kind of " -A rpm -R fosso -l 1* "
   LOG_VERBOSE0("  upload %ld wget_agent globals loaded:\n  upload_pk = %ld\n  tmpfile=%s  URL=%s  GlobalParam=%s\n",GlobalUploadKey, GlobalUploadKey,GlobalTempFile,GlobalURL,GlobalParam);
 } /* SetEnv() */
 
@@ -1058,6 +1016,7 @@ void replace_url_with_auth()
   char URI[FILEPATH] = "";
   char *token = NULL;
   char *temp = NULL;
+  char *additionalParams = NULL;
 
   if (strstr(GlobalParam, "password") && strstr(GlobalParam, "username"))
   {
@@ -1079,12 +1038,22 @@ void replace_url_with_auth()
     while( token != NULL )
     {
       if (1 == index) username = token;
-      if (3 == index) password = token;
+      if (3 == index) {
+        password = token;
+        additionalParams = token + strlen(token) + 1;
+        break;
+      }
       token = strtok(NULL, needle);
       index++;
     }
-    snprintf(GlobalURL, URLMAX, "%s%s:%s@%s", http, username, password, URI);
-    memset(GlobalParam,'\0',STRMAX);
+    snprintf(GlobalURL, URLMAX-1, "%s%s:%s@%s", http, username, password, URI);
+
+    if (strlen(additionalParams) > 0) {
+      memmove(GlobalParam, additionalParams, strlen(additionalParams) +1);
+    }
+    else {
+      memset(GlobalParam,'\0',STRMAX);
+    }
   }
 }
 

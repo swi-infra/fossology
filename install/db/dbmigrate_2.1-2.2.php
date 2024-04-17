@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2013-2014 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2013-2014 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 use Fossology\Lib\Auth\Auth;
 
 /**
@@ -67,7 +56,7 @@ function Migrate_21_22($Verbose)
   {
     // No Default User, so create one
     $Perm = 10;  //PLUGIN_DB_ADMIN;
-    $Seed = rand() . rand();
+    $Seed = random_int(0, getrandmax()) . random_int(0, getrandmax());
     $Hash = sha1($Seed . $user_name);
     $sql = "INSERT INTO users (user_name,user_desc,user_seed,user_pass,user_perm,user_email,root_folder_fk)
         VALUES ('$user_name','Default Administrator','$Seed','$Hash',$Perm,'y',1);";

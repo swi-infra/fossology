@@ -1,27 +1,17 @@
 <?php
-/***********************************************************
- * Copyright (C) 2008-2015 Hewlett-Packard Development Company, L.P.
- *               2014-2015 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2008-2015 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\Dao\AgentDao;
 use Fossology\Lib\Dao\LicenseDao;
 use Fossology\Lib\Dao\UploadDao;
+use Fossology\Lib\Dao\TreeDao;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
 use Fossology\Lib\Plugin\DefaultPlugin;
 use Fossology\Lib\Proxy\ScanJobProxy;
@@ -82,8 +72,21 @@ class ui_file_browse extends DefaultPlugin
     if (empty($Item) || empty($Upload)) {
       return;
     }
-    $viewLicenseURI = "view-license" . Traceback_parm_keep(array("show", "format", "page", "upload", "item"));
+    $viewLicenseURI = $this->Name . Traceback_parm_keep(array("show", "format", "page", "upload", "item"));
     $menuName = $this->Title;
+
+    $uploadTreeTable = $this->uploadDao->getUploadtreeTableName($Upload);
+    $itemBounds = $this->uploadDao->getItemTreeBounds($Item, $uploadTreeTable);
+    if (! $itemBounds->containsFiles()) {
+      global $container;
+      /**
+       * @var TreeDao $treeDao Tree dao object
+       */
+      $treeDao = $container->get('dao.tree');
+      $parent = $treeDao->getParentOfItem($itemBounds);
+      $viewLicenseURI = $this->NAME . Traceback_parm_keep(array("show",
+        "format", "page", "upload")) . "&item=$parent";
+    }
     if (GetParm("mod", PARM_STRING) == self::NAME) {
       menu_insert("Browse::$menuName", 98);
       menu_insert("View::$menuName", 98);
@@ -211,7 +214,7 @@ class ui_file_browse extends DefaultPlugin
    */
   public function renderString($templateName, $vars)
   {
-    return $this->renderer->loadTemplate($templateName)->render($vars);
+    return $this->renderer->load($templateName)->render($vars);
   }
 }
 

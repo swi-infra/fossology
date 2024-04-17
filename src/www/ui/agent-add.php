@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2013 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2008-2013 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Data\Upload\Upload;
@@ -98,6 +87,7 @@ class AgentAdder extends DefaultPlugin
    */
   private function agentsAdd($uploadId, $agentsToStart, Request $request)
   {
+    $mimetypeIgnore = intval($request->get('scm') == 1) ? '-I' : '';
     if (! is_array($agentsToStart)) {
       return "bad parameters";
     }
@@ -128,7 +118,11 @@ class AgentAdder extends DefaultPlugin
     }
 
     foreach ($agents as &$agent) {
-      $rv = $agent->AgentAdd($jobId, $uploadId, $errorMsg, array());
+      if (!empty($mimetypeIgnore)) {
+        $rv = $agent->AgentAdd($jobId, $uploadId, $errorMsg, array("agent_mimetype"), $mimetypeIgnore);
+      } else {
+        $rv = $agent->AgentAdd($jobId, $uploadId, $errorMsg, array());
+      }
       if ($rv == -1) {
         return $errorMsg;
       }

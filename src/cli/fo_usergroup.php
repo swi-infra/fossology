@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 
 use Fossology\Lib\Auth\Auth;
@@ -72,8 +61,8 @@ if ($user !== false) {
 
 if ($uName && !$user) {
   $pass = array_key_exists('upasswd', $opts) ? $opts['upasswd'] : '';
-  $seed = rand() . rand();
-  $hash = sha1($seed . $pass);
+  $options = array('cost' => 10);
+  $hash = password_hash($pass, PASSWORD_DEFAULT, $options);
   $desc = 'created via cli';
   $perm = array_key_exists('accesslvl', $opts) ? intval($opts['accesslvl']) : 0;
   if (array_key_exists('folder', $opts)) {
@@ -89,7 +78,7 @@ if ($uName && !$user) {
   }
   $agentList = userAgents();
   $email = $emailNotify = '';
-  add_user($uName, $desc, $seed, $hash, $perm, $email, $emailNotify, $agentList, $folderid);
+  add_user($uName, $desc, $hash, $perm, $email, $emailNotify, $agentList, $folderid);
   $user = $userDao->getUserByName($uName);
   print "added user $uName\n";
 }

@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2015, Siemens AG
-Copyright (C) 2017 TNG Technology Consulting GmbH
+ SPDX-FileCopyrightText: © 2015 Siemens AG
+ SPDX-FileCopyrightText: © 2017 TNG Technology Consulting GmbH
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 /**
  * @dir
@@ -31,6 +20,7 @@ namespace Fossology\SpdxTwo\Test;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Test\TestInstaller;
 use Fossology\Lib\Test\TestPgDb;
+use ZipArchive;
 
 include_once(__DIR__.'/../../../lib/php/Test/Agent/AgentTestMockHelper.php');
 include_once(__DIR__.'/SchedulerTestRunnerCli.php');
@@ -70,7 +60,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
   /**
    * @brief Setup test db
    */
-  protected function setUp()
+  protected function setUp() : void
   {
     $this->testDb = new TestPgDb("spdx2test");
     $this->dbManager = $this->testDb->getDbManager();
@@ -78,13 +68,13 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
     $this->runnerCli = new SchedulerTestRunnerCli($this->testDb);
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
 
-    $this->agentDir = dirname(dirname(__DIR__));
+    $this->agentDir = dirname(__DIR__, 4) . '/build/src/spdx2';
   }
 
   /**
    * @brief Teardown test db
    */
-  protected function tearDown()
+  protected function tearDown() : void
   {
     $this->testDb->fullDestruct();
     $this->testDb = null;
@@ -129,7 +119,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
     $this->testDb->createConstraints(array('agent_pkey','pfile_pkey','upload_pkey_idx',
       'FileLicense_pkey','clearing_event_pkey'));
     $this->testDb->alterTables(array('agent','pfile','upload','ars_master','license_ref_bulk','license_set_bulk',
-      'clearing_event','clearing_decision','license_file','highlight'));
+      'clearing_event','clearing_decision','license_file','license_ref','highlight'));
 
     $this->testDb->insertData(array('mimetype_ars','pkgagent_ars','ununpack_ars','decider_ars'),true,__DIR__.'/fo_report.sql');
     $this->testDb->resetSequenceAsMaxOf('agent_agent_pk_seq', 'agent', 'agent_pk');
@@ -205,7 +195,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
     assertThat($row, hasKeyValuePair('job_fk', $jobId));
     $filepath = $row['filepath'];
     assertThat($filepath, endsWith('.rdf'));
-    assertThat(file_exists($filepath),equalTo(true));
+    $this->assertFileExists($filepath, "RDF report does not exists.");
 
     return $filepath;
   }
@@ -256,32 +246,30 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
    * @brief Pull SPDX toolkit from github if not found
    *
    * -# Verify if Java is installed
-   * -# Pull version 2.1.0
-   * -# Store only spdx-tools-2.1.0-jar-with-dependencies.jar
+   * -# Pull version 1.1.4
+   * -# Store only tools-java-1.1.4-jar-with-dependencies.jar
    * @return string Jar file path
    */
   protected function pullSpdxTools()
   {
     $this-> verifyJavaIsInstalled();
 
-    $version='2.1.0';
+    $version='1.1.4';
     $tag='v'.$version;
 
-    $jarFileBasename = 'spdx-tools-'.$version.'-jar-with-dependencies.jar';
+    $jarFileBasename = 'tools-java-'.$version.'-jar-with-dependencies.jar';
     $jarFile = __DIR__.'/'.$jarFileBasename;
     if (!file_exists($jarFile)) {
-      $zipFileBasename='SPDXTools-'.$tag.'.zip';
-      $zipFile=__DIR__.'/'.$zipFileBasename;
-      if (!file_exists($zipFile)) {
-        file_put_contents($zipFile, fopen('https://github.com/spdx/tools/releases/download/'.$tag.'/'.$zipFileBasename, 'r'));
-
+      $zipFile = __DIR__ . "/spdx-tools-java-$version.zip";
+      file_put_contents($zipFile, fopen("https://github.com/spdx/tools-java/releases/download/$tag/tools-java-$version.zip", 'r'));
+      $zip = new ZipArchive;
+      if ($zip->open($zipFile) === TRUE) {
+        $zip->extractTo(__DIR__, [$jarFileBasename]);
+        $zip->close();
       }
-      $this->assertFileExists($zipFile, 'could not download SPDXTools');
-
-      system('unzip -n -d '.__DIR__.' '.$zipFile);
-      rename (__DIR__.'/SPDXTools-'.$tag.'/'.$jarFileBasename, $jarFile);
+      unlink($zipFile);
     }
-    $this->assertFileExists($jarFile, 'could not extract SPDXTools');
+    $this->assertFileExists($jarFile, 'could not download SPDXTools');
     return $jarFile;
   }
 
