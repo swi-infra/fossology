@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2014, 2018 Siemens AG
-Authors: Andreas Würl, Daniele Fognini
+ SPDX-FileCopyrightText: © 2014, 2018 Siemens AG
+ Authors: Andreas Würl, Daniele Fognini
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Data;
@@ -35,7 +24,7 @@ class Highlight
   const URL = "U";
   const EMAIL = "E";
   const AUTHOR = "A";
-  const IP = "I";
+  const IPRA = "I";
   const ECC = "X";
   const KEYWORDOTHERS = "KW";
   const UNDEFINED = "any";
@@ -125,7 +114,7 @@ class Highlight
    */
   public function setLicenseId($licenseId)
   {
-    $this->licenseId = $licenseId;
+    $this->licenseId = intval($licenseId);
   }
 
   /**
@@ -206,6 +195,23 @@ class Highlight
     return $this->htmlElement;
   }
 
+  /**
+   * Get Highlight element as associative array
+   * @return array
+   */
+  public function getArray()
+  {
+    return array(
+      "start" => $this->start,
+      "end" => $this->end,
+      "type" => $this->type,
+      "licenseId" => $this->licenseId,
+      "refStart" => $this->refStart,
+      "refEnd" => $this->refEnd,
+      "infoText" => $this->infoText,
+      "htmlElement" => $this->htmlElement
+    );
+  }
 
   public function __toString()
   {

@@ -1,21 +1,10 @@
 <?php
 /*
- Copyright (C) 2014-2017, Siemens AG
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
  Author: Daniele Fognini, Johannes Najjar
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\BusinessRules\ClearingDecisionFilter;
@@ -109,7 +98,7 @@ class ClearingView extends FO_Plugin
    * @param int $uploadId
    * @return Highlight[]
    */
-  private function getSelectedHighlighting(ItemTreeBounds $itemTreeBounds, $licenseId, $selectedAgentId, $highlightId, $clearingId, $uploadId)
+  public function getSelectedHighlighting(ItemTreeBounds $itemTreeBounds, $licenseId, $selectedAgentId, $highlightId, $clearingId, $uploadId)
   {
     $unmaskAgents = $selectedAgentId;
     if (empty($selectedAgentId)) {
@@ -217,7 +206,11 @@ class ClearingView extends FO_Plugin
     $lastItem = GetParm("lastItem", PARM_INTEGER);
 
     if (!empty($lastItem)) {
-      $this->updateLastItem($userId, $groupId,$lastItem);
+      $currentUploadtreeId = $lastItem;
+      if ($lastItem == $uploadTreeId) {
+        $currentUploadtreeId = $uploadTreeId;
+      }
+      $this->updateLastItem($userId, $groupId, $lastItem, $currentUploadtreeId);
     }
 
     $uploadTreeTableName = $this->uploadDao->getUploadtreeTableName($uploadId);
@@ -298,15 +291,32 @@ class ClearingView extends FO_Plugin
     $this->vars['clearingTypes'] = $this->decisionTypes->getMap();
     $this->vars['selectedClearingType'] = $selectedClearingType;
     $this->vars['selectedClearingScope'] = $selectedClearingScope;
-    $this->vars['tmpClearingType'] = $this->clearingDao->isDecisionWip($uploadTreeId, $groupId);
+    $this->vars['tmpClearingType'] = $this->clearingDao->isDecisionCheck($uploadTreeId, $groupId, DecisionTypes::WIP);
     $this->vars['bulkHistory'] = $bulkHistory;
 
-    $filesOfInterest = $this->clearingDao->getTotalDecisionCount($uploadId,
-      $groupId);
-    $filesCleared = $this->clearingDao->getClearingDecisionsCount($uploadId,
-      $groupId);
+    $noLicenseUploadTreeView = new UploadTreeProxy($uploadId,
+      array(UploadTreeProxy::OPT_SKIP_THESE => "noLicense",
+        UploadTreeProxy::OPT_GROUP_ID => $groupId),
+      $uploadTreeTableName,
+      'no_license_uploadtree' . $uploadId);
+    $filesOfInterest = $noLicenseUploadTreeView->count();
 
-    $this->vars['message'] = _("Cleared").": $filesCleared/$filesOfInterest";
+    $nonClearedUploadTreeView = new UploadTreeProxy($uploadId,
+      array(UploadTreeProxy::OPT_SKIP_THESE => "alreadyCleared",
+        UploadTreeProxy::OPT_GROUP_ID => $groupId),
+      $uploadTreeTableName,
+      'already_cleared_uploadtree' . $uploadId);
+    $filesToBeCleared = $nonClearedUploadTreeView->count();
+
+    $filesAlreadyCleared = $filesOfInterest - $filesToBeCleared;
+    $this->vars['message'] = _("Cleared").": $filesAlreadyCleared/$filesOfInterest";
+    if ($filesOfInterest == 0) {
+      $percentage = 100;
+    } else {
+      $percentage = ($filesAlreadyCleared / $filesOfInterest) * 100;
+      $percentage = ($percentage > 11) ? $percentage : 11;
+    }
+    $this->vars['progressBar'] = "width:".$percentage."%";
 
     return $this->render("ui-clearing-view.html.twig");
   }
@@ -330,17 +340,32 @@ class ClearingView extends FO_Plugin
 
   /**
    * @param int $userId
-   * @param int
+   * @param int $groupId
    * @param int $lastItem
+   * @param int $currentUploadtreeId
    * @return array
    */
-  protected function updateLastItem($userId, $groupId, $lastItem)
+  public function updateLastItem($userId, $groupId, $lastItem, $currentUploadtreeId)
   {
     $type = GetParm("clearingTypes", PARM_INTEGER);
     $global = GetParm("globalDecision", PARM_STRING) === "on" ? 1 : 0;
     $uploadTreeTableName = $this->uploadDao->getUploadtreeTableName($lastItem);
     $itemBounds = $this->uploadDao->getItemTreeBounds($lastItem, $uploadTreeTableName);
-    $this->clearingDecisionEventProcessor->makeDecisionFromLastEvents($itemBounds, $userId, $groupId, $type, $global);
+    if ($global) {
+      $isDecisionWip = $this->clearingDao->isDecisionCheck($currentUploadtreeId, $groupId, DecisionTypes::WIP);
+      $hasChangedClearingType = $this->clearingDao->isDecisionCheck($currentUploadtreeId, $groupId, '');
+      if ($isDecisionWip) {
+        $this->clearingDecisionEventProcessor->makeDecisionFromLastEvents($itemBounds, $userId, $groupId, $type, $global);
+      } else if (empty($hasChangedClearingType['scope'])
+             || ($hasChangedClearingType['decision_type'] != $type)
+           ) {
+        $this->clearingDecisionEventProcessor->makeDecisionFromLastEvents($itemBounds, $userId, $groupId, $type, $global);
+      } else {
+        return;
+      }
+    } else {
+      $this->clearingDecisionEventProcessor->makeDecisionFromLastEvents($itemBounds, $userId, $groupId, $type, $global);
+    }
   }
 }
 

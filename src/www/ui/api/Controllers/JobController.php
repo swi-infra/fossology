@@ -1,21 +1,11 @@
 <?php
-/***************************************************************
- Copyright (C) 2018 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2018 Siemens AG
  Author: Gaurav Mishra <mishra.gaurav@siemens.com>
+ SPDX-FileCopyrightText: © 2022 Samuel Dushimimana <dushsam100@gmail.com>
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * @file
  * @brief Controller for job queries
@@ -23,15 +13,21 @@
 
 namespace Fossology\UI\Api\Controllers;
 
-use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Fossology\Lib\Dao\ShowJobsDao;
+use Fossology\Lib\Db\DbManager;
+use Fossology\UI\Api\Exceptions\HttpBadRequestException;
+use Fossology\UI\Api\Exceptions\HttpErrorException;
+use Fossology\UI\Api\Exceptions\HttpForbiddenException;
+use Fossology\UI\Api\Exceptions\HttpInternalServerErrorException;
+use Fossology\UI\Api\Exceptions\HttpNotFoundException;
+use Fossology\UI\Api\Helper\ResponseHelper;
+use Fossology\UI\Api\Helper\UploadHelper;
 use Fossology\UI\Api\Models\Info;
 use Fossology\UI\Api\Models\InfoType;
-use Fossology\UI\Api\Models\Analysis;
-use Fossology\UI\Api\Models\Decider;
-use Fossology\UI\Api\Models\Reuser;
-use Fossology\UI\Api\Models\ScanOptions;
-use Fossology\UI\Api\Models\Job;
+use Fossology\UI\Api\Models\JobQueue;
+use Fossology\UI\Api\Models\ShowJob;
+use Psr\Http\Message\ServerRequestInterface;
+use Slim\Psr7\Request;
 
 /**
  * @class JobController
@@ -59,18 +55,20 @@ class JobController extends RestController
    * Job failed
    */
   const JOB_FAILED = 0x1 << 4;
+
   /**
-   * Get all jobs by a user
+   * Get all jobs created by all the users
    *
    * @param ServerRequestInterface $request
-   * @param ResponseInterface $response
+   * @param ResponseHelper $response
    * @param array $args
-   * @return ResponseInterface
+   * @return ResponseHelper
+   * @throws HttpErrorException
    */
-  public function getJobs($request, $response, $args)
+  public function getAllJobs($request, $response, $args)
   {
-    $query = $request->getQueryParams();
-
+    $this->throwNotAdminException();
+    $id = null;
     $limit = 0;
     $page = 1;
     if ($request->hasHeader('limit')) {
@@ -79,12 +77,40 @@ class JobController extends RestController
       if (empty($page)) {
         $page = 1;
       }
-      if ((isset($limit) && (! is_numeric($limit) || $limit < 0)) ||
+      if ((! is_numeric($limit) || $limit < 0) ||
+          (! is_numeric($page) || $page < 1)) {
+        throw new HttpBadRequestException(
+          "Limit and page cannot be smaller than 1 and has to be numeric!");
+      }
+    }
+    return $this->getAllResults($id, $response, $limit, $page);
+  }
+
+  /**
+   * Get all jobs by a user
+   *
+   * @param ServerRequestInterface $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpErrorException
+   */
+  public function getJobs($request, $response, $args)
+  {
+    $query = $request->getQueryParams();
+    $userId = $this->restHelper->getUserId();
+    $limit = 0;
+    $page = 1;
+    if ($request->hasHeader('limit')) {
+      $limit = $request->getHeaderLine('limit');
+      $page = $request->getHeaderLine('page');
+      if (empty($page)) {
+        $page = 1;
+      }
+      if ((! is_numeric($limit) || $limit < 0) ||
         (! is_numeric($page) || $page < 1)) {
-        $returnVal = new Info(400,
-          "Limit and page cannot be smaller than 1 and has to be numeric!",
-          InfoType::ERROR);
-        return $response->withJson($returnVal->getArray(), $returnVal->getCode());
+        throw new HttpBadRequestException(
+          "Limit and page cannot be smaller than 1 and has to be numeric!");
       }
     }
 
@@ -92,9 +118,7 @@ class JobController extends RestController
     if (isset($args['id'])) {
       $id = intval($args['id']);
       if (! $this->dbHelper->doesIdExist("job", "job_pk", $id)) {
-        $returnVal = new Info(404, "Job id " . $id . " doesn't exist",
-          InfoType::ERROR);
-        return $response->withJson($returnVal->getArray(), $returnVal->getCode());
+        throw new HttpNotFoundException("Job id " . $id . " doesn't exist");
       }
     }
 
@@ -108,7 +132,8 @@ class JobController extends RestController
       return $this->getFilteredResults(intval($query[self::UPLOAD_PARAM]),
         $response, $limit, $page);
     } else {
-      return $this->getAllResults($id, $response, $limit, $page);
+      $id = null;
+      return $this->getAllUserResults($id,$userId, $response, $limit, $page);
     }
   }
 
@@ -116,65 +141,122 @@ class JobController extends RestController
    * Create a new job
    *
    * @param ServerRequestInterface $request
-   * @param ResponseInterface $response
+   * @param ResponseHelper $response
    * @param array $args
-   * @return ResponseInterface
+   * @return ResponseHelper
+   * @throws HttpErrorException
    */
   public function createJob($request, $response, $args)
   {
     $folder = $request->getHeaderLine("folderId");
     $upload = $request->getHeaderLine("uploadId");
     if (is_numeric($folder) && is_numeric($upload) && $folder > 0 && $upload > 0) {
-      $scanOptionsJSON = $request->getParsedBody();
+      $scanOptionsJSON = $this->getParsedBody($request);
       if (empty($scanOptionsJSON)) {
-        $error = new Info(403, "No agents selected!", InfoType::ERROR);
-        return $response->withJson($error->getArray(), $error->getCode());
+        throw new HttpBadRequestException("No agents selected!");
       }
-      $parametersSent = false;
-      $analysis = new Analysis();
-      if (array_key_exists("analysis", $scanOptionsJSON) && ! empty($scanOptionsJSON["analysis"])) {
-        $analysis->setUsingArray($scanOptionsJSON["analysis"]);
-        $parametersSent = true;
-      }
-      $decider = new Decider();
-      if (array_key_exists("decider", $scanOptionsJSON) && ! empty($scanOptionsJSON["decider"])) {
-        $decider->setUsingArray($scanOptionsJSON["decider"]);
-        $parametersSent = true;
-      }
-      $reuser = new Reuser(0, 0, false, false);
-      try {
-        if (array_key_exists("reuse", $scanOptionsJSON) && ! empty($scanOptionsJSON["reuse"])) {
-          $reuser->setUsingArray($scanOptionsJSON["reuse"]);
-          $parametersSent = true;
-        }
-      } catch (\UnexpectedValueException $e) {
-        $error = new Info($e->getCode(), $e->getMessage(), InfoType::ERROR);
-        return $response->withJson($error->getArray(), $error->getCode());
-      }
-
-      if (! $parametersSent) {
-        $error = new Info(403, "No parameters selected for agents!",
-          InfoType::ERROR);
-        return $response->withJson($error->getArray(), $error->getCode());
-      }
-
-      $scanOptions = new ScanOptions($analysis, $reuser, $decider);
-      $info = $scanOptions->scheduleAgents($folder, $upload);
+      $uploadHelper = new UploadHelper();
+      $info = $uploadHelper->handleScheduleAnalysis($upload, $folder,
+        $scanOptionsJSON);
       return $response->withJson($info->getArray(), $info->getCode());
-    } else {
-      $error = new Info(400, "Folder id and upload id should be integers!", InfoType::ERROR);
-      return $response->withJson($error->getArray(), $error->getCode());
     }
+    throw new HttpBadRequestException(
+      "Folder id and upload id should be integers!");
+  }
+
+  /**
+   * Delete a job using it's Job ID and Queue ID. Job ID is job_pk in job table
+   * and Queue ID is jobqueue_pk in jobqueue table
+   *
+   * @param ServerRequestInterface $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpErrorException
+   */
+  public function deleteJob($request, $response, $args)
+  {
+    $userId = $this->restHelper->getUserId();
+    $userName = $this->restHelper->getUserDao()->getUserName($userId);
+
+    /* Check if the job exists */
+    $jobId  = intval($args['id']);
+    if (! $this->dbHelper->doesIdExist("job", "job_pk", $jobId)) {
+      throw new HttpNotFoundException("Job id " . $jobId . " doesn't exist");
+    }
+
+    /* Check if user has permission to delete this job*/
+    $canDeleteJob = $this->restHelper->getJobDao()->hasActionPermissionsOnJob($jobId, $userId, $this->restHelper->getGroupId());
+    if (! $canDeleteJob) {
+      throw new HttpForbiddenException(
+        "You don't have permission to delete this job.");
+    }
+
+    $queueId = $args['queue'];
+
+    /* Get Jobs that depend on the job to be deleted */
+    $JobQueue = $this->restHelper->getShowJobDao()->getJobInfo([$jobId])[$jobId]["jobqueue"];
+
+    if (!array_key_exists($queueId, $JobQueue)) {
+      throw new HttpNotFoundException(
+        "Job queue " . $queueId . " doesn't exist in Job " . $jobId);
+    }
+
+    $dependentJobs = [];
+    $dependentJobs[] = $queueId;
+
+    foreach ($JobQueue as $job) {
+      if (in_array($queueId, $job["depends"])) {
+        $dependentJobs[] = $job["jq_pk"];
+      }
+    }
+
+    /* Delete All jobs in dependentJobs */
+    foreach ($dependentJobs as $job) {
+      $Msg = "\"" . _("Killed by") . " " . $userName . "\"";
+      $command = "kill $job $Msg";
+      $rv = fo_communicate_with_scheduler($command, $response_from_scheduler, $error_info);
+      if (!$rv) {
+        throw new HttpInternalServerErrorException(
+          "Failed to kill job $jobId");
+      }
+    }
+    $returnVal = new Info(200, "Job deleted successfully", InfoType::INFO);
+    return $response->withJson($returnVal->getArray(), $returnVal->getCode());
+  }
+
+  /**
+   * Get all jobs created by the current user.
+   *
+   * @param integer|null $id Specific job id or null for all jobs
+   * @param integer $uid Specific user id
+   * @param ResponseHelper $response Response object
+   * @param integer $limit   Limit of jobs per page
+   * @param integer $page    Page number required
+   * @return ResponseHelper
+   */
+  private function getAllUserResults($id, $uid, $response, $limit, $page)
+  {
+    list($jobs, $count) = $this->dbHelper->getUserJobs($id, $uid, $limit, $page);
+    $finalJobs = [];
+    foreach ($jobs as $job) {
+      $this->updateEtaAndStatus($job);
+      $finalJobs[] = $job->getArray();
+    }
+    if ($id !== null) {
+      $finalJobs = $finalJobs[0];
+    }
+    return $response->withHeader("X-Total-Pages", $count)->withJson($finalJobs, 200);
   }
 
   /**
    * Get all jobs for the current user.
    *
    * @param integer|null $id Specific job id or null for all jobs
-   * @param ResponseInterface $response Response object
+   * @param ResponseHelper $response Response object
    * @param integer $limit   Limit of jobs per page
    * @param integer $page    Page number required
-   * @return ResponseInterface
+   * @return ResponseHelper
    */
   private function getAllResults($id, $response, $limit, $page)
   {
@@ -194,17 +276,17 @@ class JobController extends RestController
    * Get all jobs for the given upload.
    *
    * @param integer $uploadId Upload id to be filtered
-   * @param ResponseInterface $response Response object
-   * @param integer $limit    Limit of jobs per page
-   * @param integer $page     Page number required
-   * @return ResponseInterface
+   * @param ResponseHelper $response Response object
+   * @param integer $limit Limit of jobs per page
+   * @param integer $page Page number required
+   * @return ResponseHelper
+   * @throws HttpNotFoundException
    */
   private function getFilteredResults($uploadId, $response, $limit, $page)
   {
     if (! $this->dbHelper->doesIdExist("upload", "upload_pk", $uploadId)) {
-      $returnVal = new Info(404, "Upload id " . $uploadId . " doesn't exist",
-        InfoType::ERROR);
-      return $response->withJson($returnVal->getArray(), $returnVal->getCode());
+      throw new HttpNotFoundException("Upload id " . $uploadId .
+        " doesn't exist");
     }
     list($jobs, $count) = $this->dbHelper->getJobs(null, $limit, $page, $uploadId);
     $finalJobs = [];
@@ -224,8 +306,6 @@ class JobController extends RestController
   {
     $jobDao = $this->restHelper->getJobDao();
 
-    $eta = 0;
-    $status = "";
     $jobqueue = [];
 
     /* Check if the job has no upload like Maintenance job */
@@ -261,7 +341,7 @@ class JobController extends RestController
     $eta = $showJobDao->getEstimatedTime($jobId, '', 0, $uploadId);
     $eta = explode(":", $eta);
     if (count($eta) > 1) {
-      $eta = ($eta[0] * 3600) + ($eta[1] * 60) + ($eta[2]);
+      $eta = (intval($eta[0]) * 3600) + (intval($eta[1]) * 60) + intval($eta[2]);
     } else {
       $eta = 0;
     }
@@ -301,18 +381,263 @@ class JobController extends RestController
     }
 
     $jobStatusString = "";
-    if ($jobStatus & self::JOB_STARTED) {
+    if ($jobStatus & self::JOB_FAILED) {
+      /* If at least one job is failed, set status as failed */
+      $jobStatusString = "Failed";
+    } else if ($jobStatus & self::JOB_STARTED) {
       /* If at least one job is started, set status as processing */
       $jobStatusString = "Processing";
     } else if ($jobStatus & self::JOB_QUEUED) {
       $jobStatusString = "Queued";
-    } else if ($jobStatus & self::JOB_FAILED) {
-      /* If at least one job is failed, set status as failed */
-      $jobStatusString = "Failed";
     } else {
       /* If everything completed successfully, set status as completed */
       $jobStatusString = "Completed";
     }
     return $jobStatusString;
+  }
+
+  /**
+   * Get the history of all the jobs queued based on an upload
+   *
+   * @param Request $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpErrorException
+   */
+  public function getJobsHistory($request, $response, $args)
+  {
+    $query = $request->getQueryParams();
+    if (!array_key_exists(self::UPLOAD_PARAM, $query)) {
+      throw new HttpBadRequestException("'upload' is a required query param");
+    }
+    $upload_fk = intval($query[self::UPLOAD_PARAM]);
+    // checking if the upload exists and if yes, whether it is accessible
+    $this->uploadAccessible($upload_fk);
+
+    /**
+     * @var DbManager $dbManager
+     * initialising the DB manager
+     */
+    $dbManager = $this->dbHelper->getDbManager();
+
+    // getting all the jobs from the DB for the upload id
+    $query = "SELECT job_pk FROM job WHERE job_upload_fk=$1;";
+    $statement = __METHOD__.".getJobs";
+    $result = $dbManager->getRows($query, [$upload_fk], $statement);
+
+    // creating a list of all the job_pks
+    $allJobPks = array_column($result, 'job_pk');
+
+    /**
+     * @var ShowJobsDao $showJobsDao
+     * initialising the show jobs Dao
+     */
+    $showJobsDao = $this->container->get('dao.show_jobs');
+
+    $jobsInfo = $showJobsDao->getJobInfo($allJobPks);
+    usort($jobsInfo, [$this, "compareJobsInfo"]);
+
+    /**
+     * @var \Fossology\UI\Ajax\AjaxShowJobs $ajaxShowJobs
+     * initialising the show jobs ajax plugin
+     */
+    $ajaxShowJobs = $this->restHelper->getPlugin('ajaxShowJobs');
+
+    // getting the show jobs data for each job
+    $showJobData = $ajaxShowJobs->getShowJobsForEachJob($jobsInfo);
+
+    // creating the response structure
+    $allJobsHistory = array();
+    foreach ($showJobData as $jobValObj) {
+      $finalJobqueue = array();
+      foreach ($jobValObj['job']['jobQueue'] as $jqVal) {
+        $depends = [];
+        if ($jqVal['depends'][0] != null) {
+          $depends = $jqVal['depends'];
+        }
+        $download = null;
+        if (!empty($jqVal['download'])) {
+          $download = [
+            "text" => $jqVal["download"],
+            "link" => ReportController::buildDownloadPath($request,
+              $jqVal['jq_job_fk'])
+          ];
+        }
+        $jobQueue = new JobQueue($jqVal['jq_pk'], $jqVal['jq_type'],
+          $jqVal['jq_starttime'], $jqVal['jq_endtime'], $jqVal['jq_endtext'],
+          $jqVal['jq_itemsprocessed'], $jqVal['jq_log'], $depends,
+          $jqVal['itemsPerSec'], $jqVal['canDoActions'], $jqVal['isInProgress'],
+          $jqVal['isReady'], $download);
+        $finalJobqueue[] = $jobQueue->getArray();
+      }
+      $job = new ShowJob($jobValObj['job']['jobId'],
+        $jobValObj['job']['jobName'], $finalJobqueue,
+        $jobValObj['upload']['uploadId']);
+      $allJobsHistory[] = $job->getArray();
+    }
+    return $response->withJson($allJobsHistory, 200);
+  }
+
+  /**
+   * @brief Sort compare function to order $JobsInfo by job_pk
+   * @param array $JobsInfo1 Result from GetJobInfo
+   * @param array $JobsInfo2 Result from GetJobInfo
+   * @return int
+   */
+  private function compareJobsInfo($JobsInfo1, $JobsInfo2)
+  {
+    return $JobsInfo2["job"]["job_pk"] - $JobsInfo1["job"]["job_pk"];
+  }
+
+  /**
+   * @brief Get the summary statistics of all the jobs
+   * @param Request $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpForbiddenException
+   */
+  public function getJobStatistics($request, $response, $args)
+  {
+    $this->throwNotAdminException();
+    /** @var \dashboardReporting $statisticsPlugin */
+    $statisticsPlugin = $this->restHelper->getPlugin('dashboard-statistics');
+    $res = $statisticsPlugin->CountAllJobs(true);
+    return $response->withJson($res, 200);
+  }
+
+  /**
+   * Get all the server jobs with status
+   *
+   * @param Request $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpForbiddenException
+   */
+  public function getAllServerJobsStatus($request, $response, $args)
+  {
+    $this->throwNotAdminException();
+    /** @var \Fossology\UI\Ajax\AjaxAllJobStatus $allJobStatusPlugin */
+    $allJobStatusPlugin = $this->restHelper->getPlugin('ajax_all_job_status');
+    $symfonyRequest = new \Symfony\Component\HttpFoundation\Request();
+    $res = $allJobStatusPlugin->handle($symfonyRequest);
+    return $response->withJson(json_decode($res->getContent(), true), 200);
+  }
+
+  /**
+   * @brief Get the scheduler job options for a given operation
+   * @param Request $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpErrorException
+   */
+  public function getSchedulerJobOptionsByOperation($request, $response, $args)
+  {
+    $this->throwNotAdminException();
+    $operation = $args['operationName'];
+    /** @var \admin_scheduler $adminSchedulerPlugin */
+    $adminSchedulerPlugin = $this->restHelper->getPlugin('admin_scheduler');
+
+    if (!in_array($operation, array_keys($adminSchedulerPlugin->operation_array))) {
+      $allowedOperations = implode(', ', array_keys($adminSchedulerPlugin->operation_array));
+      throw new HttpBadRequestException("Operation '$operation' not allowed." .
+        " Allowed operations are: $allowedOperations");
+    }
+
+    /** @var \Fossology\UI\Ajax\AjaxAdminScheduler $schedulerPlugin */
+    $schedulerPlugin = $this->restHelper->getPlugin('ajax_admin_scheduler');
+    $symfonyRequest = new \Symfony\Component\HttpFoundation\Request();
+    $symfonyRequest->request->set('operation', $operation);
+    $symfonyRequest->request->set('fromRest', true);
+    $res = $schedulerPlugin->handle($symfonyRequest);
+    return $response->withJson($res, 200);
+  }
+
+  /**
+   * Run the scheduler based on the given operation
+   *
+   * @param Request $request
+   * @param ResponseHelper $response
+   * @param array $args
+   * @return ResponseHelper
+   * @throws HttpErrorException
+   */
+  public function handleRunSchedulerOption($request, $response, $args)
+  {
+    $this->throwNotAdminException();
+    $body = $this->getParsedBody($request);
+    $query = $request->getQueryParams();
+
+    $operation = $body['operation'];
+    /** @var \admin_scheduler $adminSchedulerPlugin */
+    $adminSchedulerPlugin = $this->restHelper->getPlugin('admin_scheduler');
+
+    if (!in_array($operation, array_keys($adminSchedulerPlugin->operation_array))) {
+      $allowedOperations = implode(', ', array_keys($adminSchedulerPlugin->operation_array));
+      throw new HttpBadRequestException("Operation '$operation' not allowed." .
+        " Allowed operations are: $allowedOperations");
+    }
+
+    /** @var \Fossology\UI\Ajax\AjaxAdminScheduler $schedulerPlugin */
+    $schedulerPlugin = $this->restHelper->getPlugin('ajax_admin_scheduler');
+    $symfonyRequest = new \Symfony\Component\HttpFoundation\Request();
+    $symfonyRequest->request->set('operation', $operation);
+    $symfonyRequest->request->set('fromRest', true);
+    $data = $schedulerPlugin->handle($symfonyRequest);
+
+    if ($operation == 'status' || $operation == 'verbose') {
+      if (!isset($query['job']) || !in_array($query['job'], $data['jobList'])) {
+        $allowedJobs = implode(', ', $data['jobList']);
+        throw new HttpBadRequestException("Job '{$query['job']}' not " .
+          "allowed. Allowed jobs are: $allowedJobs");
+      }
+      if (($operation == 'verbose') && (!isset($query['level']) || !in_array($query['level'], $data['verboseList']))) {
+        $allowedLevels = implode(', ', $data['verboseList']);
+        throw new HttpBadRequestException("Level '{$query['level']}' not " .
+          "allowed. Allowed levels are: $allowedLevels");
+      }
+    } elseif ($operation == 'priority' && (!isset($query['priority']) || !in_array($query['priority'], $data['priorityList']))) {
+      $allowedPriorities = implode(', ', $data['priorityList']);
+      throw new HttpBadRequestException("Priority '{$query['priority']}' not " .
+        "allowed. Allowed priorities are: $allowedPriorities");
+    }
+
+    if ($operation == 'status') {
+      $query['priority'] = null;
+      $query['level'] = null;
+    } else if ($operation == 'priority') {
+      $query['job'] = null;
+      $query['level'] = null;
+    } else if ($operation == 'verbose') {
+      $query['priority'] = null;
+    } else {
+      $query['job'] = null;
+      $query['priority'] = null;
+      $query['level'] = null;
+    }
+
+    $response_from_scheduler = $adminSchedulerPlugin->OperationSubmit(
+      $operation, array_search($query['job'], $data['jobList']),
+      $query['priority'], $query['level']);
+    $operation_text = $adminSchedulerPlugin->GetOperationText($operation);
+    $status_msg = "";
+    $report = "";
+
+    if (!empty($adminSchedulerPlugin->error_info)) {
+      $text = _("failed");
+      $status_msg .= "$operation_text $text.";
+      throw new HttpInternalServerErrorException($status_msg . $report);
+    }
+    $text = _("successfully");
+    $status_msg .= "$operation_text $text.";
+    if (! empty($response_from_scheduler)) {
+      $report .= $response_from_scheduler;
+    }
+
+    $info = new Info(200, $status_msg. $report, InfoType::INFO);
+    return $response->withJson($info->getArray(), $info->getCode());
   }
 }

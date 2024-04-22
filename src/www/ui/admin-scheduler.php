@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2011-2013 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011-2013 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * \file admin-scheduler.php
@@ -30,7 +19,7 @@ define("TITLE_ADMIN_SCHEDULER", _("Scheduler Administration"));
 class admin_scheduler extends FO_Plugin
 {
   var $error_info = "";
-  var $operation_array;
+  public $operation_array;
 
   function __construct()
   {
@@ -38,6 +27,20 @@ class admin_scheduler extends FO_Plugin
     $this->Title      = TITLE_ADMIN_SCHEDULER;
     $this->MenuList   = "Admin::Scheduler";
     $this->DBaccess   = PLUGIN_DB_ADMIN;
+    $this->operation_array = array
+    (
+      "status" => array(_("Status"), _("Display job or scheduler status.")),
+      "database" => array(_("Check job queue"),_("Check for new jobs.")),
+      "reload" => array(_("Reload"), _("Reload fossology.conf.")),
+      "agents" => array(_("Agents"), _("Show a list of enabled agents.")),
+      "verbose" => array(_("Verbose"), _("Change the verbosity level of the scheduler or a job.")),
+      "stop" => array(_("Shutdown Scheduler"), _("Shutdown the scheduler gracefully and stop all background processing.  This can take a while for all the agents to quit.")),
+      //    "start" => array(_("Start Scheduler"), _("Start Scheduler.")),
+      //    "restarts" => array(_("Restart Scheduler"), _("Restart Scheduler.")),
+      "restart" => array(_("Unpause a job"), _("Unpause a job.")),
+      "pause" => array(_("Pause a running job"), _("Pause a running job.")),
+      "priority" => array(_("Priority"), _("Change the priority of a job."))
+    );
     parent::__construct();
   }
 
@@ -66,9 +69,10 @@ class admin_scheduler extends FO_Plugin
       return $job_list_option;
     }
     $job_array = GetRunnableJobList(); /* get all job list */
-    for ($i = 0; $i < sizeof($job_array); $i ++) {
-      $job_id = $job_array[$i];
-      $job_list_option .= "<option value='$job_id'>$job_id</option>";
+    if (!empty($job_array)) {
+      foreach ($job_array as $job_id) {
+        $job_list_option .= "<option value='$job_id'>$job_id</option>";
+      }
     }
     return $job_list_option;
   }
@@ -78,7 +82,7 @@ class admin_scheduler extends FO_Plugin
    * \param $operation operation name, e.g. 'status'
    * \return one operation text
    **/
-  function GetOperationText($operation)
+  public function GetOperationText($operation)
   {
     $operation_text = '';
     $job_id = GetParm('job_list', PARM_TEXT);
@@ -151,7 +155,7 @@ class admin_scheduler extends FO_Plugin
    * \param $level_id selected level id
    * \return return response from the scheduler
    **/
-  function OperationSubmit($operation, $job_id, $priority_id, $level_id)
+  public function OperationSubmit($operation, $job_id, $priority_id, $level_id)
   {
     if ("start" === $operation) {
       // start the scheduler
@@ -207,21 +211,6 @@ class admin_scheduler extends FO_Plugin
   {
     $V="";
     $status_msg = "";
-
-    $this->operation_array = array
-    (
-    "status" => array(_("Status"), _("Display job or scheduler status.")),
-    "database" => array(_("Check job queue"),_("Check for new jobs.")),
-    "reload" => array(_("Reload"), _("Reload fossology.conf.")),
-    "agents" => array(_("Agents"), _("Show a list of enabled agents.")),
-    "verbose" => array(_("Verbose"), _("Change the verbosity level of the scheduler or a job.")),
-    "stop" => array(_("Shutdown Scheduler"), _("Shutdown the scheduler gracefully and stop all background processing.  This can take a while for all the agents to quit.")),
-    //    "start" => array(_("Start Scheduler"), _("Start Scheduler.")),
-    //    "restarts" => array(_("Restart Scheduler"), _("Restart Scheduler.")),
-    "restart" => array(_("Unpause a job"), _("Unpause a job.")),
-    "pause" => array(_("Pause a running job"), _("Pause a running job.")),
-    "priority" => array(_("Priority"), _("Change the priority of a job."))
-    );
 
     $operation = GetParm('operation', PARM_TEXT);
     $job_id = GetParm('job_list', PARM_TEXT);

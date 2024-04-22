@@ -1,21 +1,13 @@
 <?php
-/***********************************************************
- Copyright (C) 2009-2014 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2017, Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2009-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2017 Siemens AG
+ SPDX-FileCopyrightText: © 2020 Robert Bosch GmbH
+ SPDX-FileCopyrightText: © Dineshkumar Devarajan <Devarajan.Dineshkumar@in.bosch.com>
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
 use Symfony\Component\HttpFoundation\Session\Session;
 
 /**
@@ -117,6 +109,30 @@ function HumanSize( $bytes )
 }
 
 /**
+ * @brief Convert DateInterval to Human readable format
+ *
+ * If DateInterval is more than 1 year, then return years, else return months,
+ * else return days. If duration is less than 1 day, then return hours and
+ * minutes.
+ * @param DateInterval $duration Duration to convert
+ * @return string Formatted duration
+ */
+function HumanDuration(DateInterval $duration): string
+{
+  $humanDuration = "";
+  if ($duration->y > 0) {
+    $humanDuration .= $duration->y . " y";
+  } elseif ($duration->m > 0) {
+    $humanDuration .= $duration->m . " m";
+  } elseif ($duration->days > 0) {
+    $humanDuration .= $duration->days . " d";
+  } else {
+    $humanDuration .= $duration->h . "h " . $duration->i . "m";
+  }
+  return $humanDuration;
+}
+
+/**
  * \brief Get File Extension (text after last period)
  *
  * \param string $fname File name
@@ -126,8 +142,7 @@ function HumanSize( $bytes )
 function GetFileExt($fname)
 {
   $extpos = strrpos($fname, '.') + 1;
-  $extension = strtolower(substr($fname, $extpos));
-  return $extension;
+  return strtolower(substr($fname, $extpos));
 }
 
 
@@ -288,4 +303,19 @@ function Get1stUploadtreeID($upload)
   $uploadtree_id = $row['max'];
   pg_free_result($result);
   return $uploadtree_id;
+}
+
+/**
+ * \brief Convert the server time to browser time
+ * \param time $server_time to be converted
+ */
+function Convert2BrowserTime($server_time)
+{
+  $server_timezone = date_default_timezone_get();
+  $browser_time = new \DateTime($server_time, new \DateTimeZone($server_timezone));
+  if (array_key_exists("timezone", $_SESSION)) {
+    $tz = $_SESSION["timezone"];
+    $browser_time->setTimeZone(new \DateTimeZone($tz));
+  }
+  return $browser_time->format('Y-m-d H:i:s');
 }

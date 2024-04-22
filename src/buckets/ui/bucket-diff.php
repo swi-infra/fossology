@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2011-2014 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2015 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2011-2014 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2015 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
@@ -71,7 +60,7 @@ class ui_diff_buckets extends FO_Plugin
     {
       global $Plugins;
       $this->State=PLUGIN_STATE_VALID;
-      array_push($Plugins,$this);
+      $Plugins[] = $this;
     }
 
     return($this->State == PLUGIN_STATE_VALID);
@@ -262,7 +251,7 @@ return;
     /* If both $Child and $OtherChild are specified,
      * reassemble bucketstr and highlight the differences
      */
-    if ($OtherChild and $OtherChild)
+    if ($Child and $OtherChild)
     {
       $bucketstr = "";
       foreach ($Child['bucketarray'] as $bucket_pk)

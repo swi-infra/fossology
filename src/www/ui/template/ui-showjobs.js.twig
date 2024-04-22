@@ -1,20 +1,8 @@
-{#
-Copyright (C) 2015,2019 Siemens AG
-Author: Shaheem Azmal<shaheem.azmal@siemens.com>, 
-        Anupam Ghosh <anupam.ghosh@siemens.com>
+{# SPDX-FileCopyrightText: © 2015, 2019 Siemens AG
+   Author: Shaheem Azmal<shaheem.azmal@siemens.com>, 
+           Anupam Ghosh <anupam.ghosh@siemens.com>
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+   SPDX-License-Identifier: GPL-2.0-only
 #}
 
 var prev = "0";
@@ -23,6 +11,7 @@ var uploadId = {{ uploadId }};
 var allUsers = {{ allusersval }};
 var pageIndex = {{ page }};
 var fullUri = '?mod=showjobs&upload=' + uploadId;
+var allJobsUri = '?mod=all_job_status';
 if (allUsers != 0) {
   fullUri += '&allusers=' + allUsers;
 }
@@ -67,7 +56,6 @@ function createShowJobsTable(data)
   var mainTBody = $("#showjobstable tbody");
   var joblist = data.showJobsData;
 
-  $("#paginationup").empty();
   mainTBody.empty();
   $("#paginationdown").empty();
 
@@ -98,7 +86,6 @@ function createShowJobsTable(data)
       i = i + 1;
     }
   }
-  $("#paginationup").append(data.pagination);
   $("#paginationdown").append(data.pagination);
 }
 
@@ -113,16 +100,28 @@ function createTableForJob(job) {
     uploadLink = '<a title="{{ "Click to browse"|trans }}" ' +
     'href="?mod=browse&upload=' + job.upload.uploadId + '&item=' +
     job.upload.uploadItem + '">' + job.upload.uploadName + '</a>';
+  } else if (job.upload !== null && job.job.jobName == "Delete") {
+    uploadLink = '<span style="color:black">' + job.upload.uploadName +
+      ' (Deleted)</span>';
   } else {
     uploadLink = '<span style="color:black">' + job.job.jobName + '</span>';
   }
   var uploadETA = "";
-  if ((job.upload !== null) && (job.upload.uploadEta !== null)) {
-    uploadETA = job.upload.uploadEta;
-  }
+  var allJobsStatus = "";
+  $.each(job.job.jobQueue, function(jobQueueId, jobQueueData) {
+    if (jobQueueData.canDoActions && jobQueueData.isInProgress) {
+      if ((job.upload !== null) && (job.upload.uploadEta !== null)) {
+        uploadETA = job.upload.uploadEta;
+      }
+      if (allJobsStatus == ""){
+        allJobsStatus += ' [<a href="' + allJobsUri;
+        allJobsStatus += '" title="{{ 'View all jobs in dashboard'|trans }}">{{ 'Status'|trans }}</a>]';
+      }
+    }
+  });
   tableTemplate.html('<thead><tr><th></th>' +
-    '<th colspan="6">' + uploadLink + '</th><th style="color:black">' +
-    uploadETA + '</th></tr>' + '</thead><tbody></tbody>');
+    '<th colspan="6" class="text-center">' + uploadLink + '</th><th style="color:black">' +
+    allJobsStatus +' '+ uploadETA + '</th></tr>' + '</thead><tbody></tbody>');
   return tableTemplate;
 }
 

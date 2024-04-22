@@ -1,30 +1,22 @@
 <?php
 /*
- Copyright (C) 2017, Siemens AG
+ SPDX-FileCopyrightText: © 2017 Siemens AG
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
 /**
  * @dir
  * @brief Contains UI plugin for unified report agent
  * @file
  * @brief Contains UI plugin for unified report agent
  */
+namespace Fossology\UnifiedReport\UI;
+
 use Fossology\Lib\Auth\Auth;
+use Fossology\Lib\Data\Upload\Upload;
 use Fossology\Lib\Plugin\DefaultPlugin;
 use Symfony\Component\HttpFoundation\Request;
-use Fossology\Lib\Data\Upload\Upload;
 
 /**
  * @class FoUnifiedReportGenerator
@@ -68,7 +60,7 @@ class FoUnifiedReportGenerator extends DefaultPlugin
                   'reportType' => "Unified");
     $text = sprintf(_("Generating new report for '%s'"), $upload->getFilename());
     $vars['content'] = "<h2>".$text."</h2>";
-    $content = $this->renderer->loadTemplate("report.html.twig")->render($vars);
+    $content = $this->renderer->load("report.html.twig")->render($vars);
     $message = '<h3 id="jobResult"></h3>';
     $request->duplicate(array('injectedMessage'=>$message,'injectedFoot'=>$content,'mod'=>'showjobs'))->overrideGlobals();
     $showJobsPlugin = \plugin_find('showjobs');
@@ -125,7 +117,9 @@ class FoUnifiedReportGenerator extends DefaultPlugin
     $uploadId = $upload->getId();
     $jobId = JobAddJob($userId, $groupId, $upload->getFilename(), $uploadId);
     $error = "";
-    $jobQueueId = $reportGenAgent->AgentAdd($jobId, $uploadId, $error, array(), tracebackTotalUri());
+    $url = tracebackTotalUri();
+    $url = preg_replace("/api\/.*/i", "", $url); // Remove api/v1/report
+    $jobQueueId = $reportGenAgent->AgentAdd($jobId, $uploadId, $error, array(), $url);
     return array($jobId, $jobQueueId, $error);
   }
 }

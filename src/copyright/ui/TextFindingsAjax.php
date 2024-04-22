@@ -1,22 +1,9 @@
 <?php
-/**
- * *********************************************************
- * Copyright (C) 2019 Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- * *********************************************************
- */
+/*
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 namespace Fossology\Agent\Copyright\UI;
 
 use Fossology\Lib\Auth\Auth;
@@ -325,7 +312,9 @@ class TextFindingsAjax
         "id='deleteBySelectfinding$hash' value='$hash,$upload," .
         $this->getDecisionTypeName($type) . "'>";
     } else {
-      $output['3'] = "";
+      $output['3'] = "<input type='checkbox' class='undoBySelect$type' " .
+        "id='undoBySelectfinding$hash' value='$hash,$upload," .
+        $this->getDecisionTypeName($type) . "'>";
     }
     return $output;
   }
@@ -339,14 +328,7 @@ class TextFindingsAjax
    */
   private function getTableName($type)
   {
-    switch ($type) {
-      case "copyFindings":
-        $tableName = "copyright_decision";
-        break;
-      default:
-        $tableName = "copyright_decision";
-    }
-    return $tableName;
+    return "copyright_decision";
   }
 
   /**
@@ -358,14 +340,7 @@ class TextFindingsAjax
    */
   private function getDecisionTypeName($type)
   {
-    switch ($type) {
-      case "copyFindings":
-        $typeName = "copyright";
-        break;
-      default:
-        $typeName = "copyright";
-    }
-    return $typeName;
+    return "copyright";
   }
 
   /**
@@ -377,13 +352,6 @@ class TextFindingsAjax
    */
   private function getViewName($type)
   {
-    switch ($type) {
-      case "copyFindings":
-        $viewName = "copyright-list";
-        break;
-      default:
-        $viewName = "copyright-list";
-    }
-    return $viewName;
+    return "copyright-list";
   }
 }

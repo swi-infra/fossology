@@ -1,19 +1,8 @@
 /*
- * Copyright (C) 2019, Siemens AG
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ SPDX-FileCopyrightText: © 2019 Siemens AG
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 #include "OjoAgent.hpp"
 
@@ -38,6 +27,8 @@ OjoAgent::OjoAgent() :
  * Scan a single file (when running from scheduler).
  * @param filePath        The file to be scanned.
  * @param databaseHandler Database handler to be used.
+ * @param groupId         Group running the scan
+ * @param userId          User running the scan
  * @return List of matches found.
  * @sa OjoAgent::scanString()
  * @sa OjoAgent::filterMatches()
@@ -46,7 +37,7 @@ OjoAgent::OjoAgent() :
  * read with the file path in description.
  */
 vector<ojomatch> OjoAgent::processFile(const string &filePath,
-  OjosDatabaseHandler &databaseHandler)
+  OjosDatabaseHandler &databaseHandler, const int groupId, const int userId)
 {
   ifstream stream(filePath);
   std::stringstream sstr;
@@ -67,7 +58,7 @@ vector<ojomatch> OjoAgent::processFile(const string &filePath,
     scanString(m.content, regDualLicense, licenseNames, m.start, true);
   }
 
-  findLicenseId(licenseNames, databaseHandler);
+  findLicenseId(licenseNames, databaseHandler, groupId, userId);
   filterMatches(licenseNames);
 
   return licenseNames;
@@ -167,14 +158,16 @@ void OjoAgent::filterMatches(vector<ojomatch> &matches)
  * Update the license id for each match entry
  * @param[in,out] matches List of matches to be updated
  * @param databaseHandler Database handler to be used
+ * @param groupId         Group running the scan
+ * @param userId          User running the scan
  */
 void OjoAgent::findLicenseId(vector<ojomatch> &matches,
-  OjosDatabaseHandler &databaseHandler)
+  OjosDatabaseHandler &databaseHandler, const int groupId, const int userId)
 {
   // Update license_fk
   for (size_t i = 0; i < matches.size(); ++i)
   {
     matches[i].license_fk = databaseHandler.getLicenseIdForName(
-      matches[i].content);
+      matches[i].content, groupId, userId);
   }
 }

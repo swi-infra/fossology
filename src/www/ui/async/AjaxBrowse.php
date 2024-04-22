@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- * Copyright (C) 2014-2015 Siemens AG
- * Author: J.Najjar, S. Weber
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ Author: J.Najjar, S. Weber
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\UI\Ajax;
 
@@ -175,8 +164,18 @@ class AjaxBrowse extends DefaultPlugin
     }
 
     $itemId = Isartifact($row['ufile_mode']) ? DirGetNonArtifact($row['uploadtree_pk']) : $row['uploadtree_pk'];
-
-    $nameColumn = "<b>$fileName</b>";
+    if (strlen($fileName) > 20) {
+      $splitFileName = str_split($fileName, 20);
+      $fileName = "";
+      foreach ($splitFileName as $key => $value) {
+        if (strlen($value) > 3 && $key > 0) {
+          $fileName .= "<br/>".$value;
+        } else {
+          $fileName = $fileName.$value;
+        }
+      }
+    }
+    $nameColumn = "<strong class='btn btn-sm font-weight-bold' style='margin-left:10px;font-size:11pt;'>$fileName</strong>";
     if (IsContainer($row['ufile_mode'])) {
       $nameColumn = "<a href='$uri&upload=$uploadId&folder=$folder&item=$itemId&show=$show'>$nameColumn</a>";
     }
@@ -186,18 +185,17 @@ class AjaxBrowse extends DefaultPlugin
     }
     $Parm = "upload=$uploadId&show=$show&item=" . $row['uploadtree_pk'];
     if (Iscontainer($row['ufile_mode'])) {
-      $nameColumn .= MenuRenderer::menuToActiveSelect($menuPfile, $Parm, $uploadId);
+      $nameAction = MenuRenderer::menuToActiveSelect($menuPfile, $Parm, $uploadId, $folder);
     } else {
-      $nameColumn .= MenuRenderer::menuToActiveSelect($menuPfileNoCompare, $Parm, $uploadId);
+      $nameAction = MenuRenderer::menuToActiveSelect($menuPfileNoCompare, $Parm, $uploadId, $folder);
     }
 
     $modsUploadMulti = MenuHook::getAgentPluginNames('UploadMulti');
     if (!empty($modsUploadMulti)) {
-      $nameColumn = '<input type="checkbox" name="uploads[]" class="browse-upload-checkbox" value="'.$uploadId.'"/>'.$nameColumn;
+      $nameColumn = '<input type="checkbox" name="uploads[]" class="browse-upload-checkbox" style="width:1.10rem;height:1.10rem;" value="'.$uploadId.'"/>'.$nameColumn;
     }
 
-    $dateCol = substr($row['upload_ts'], 0, 19);
-    $pairIdPrio = array($uploadId, floatval($row[UploadBrowseProxy::PRIO_COLUMN]));
+    $dateCol = Convert2BrowserTime(substr($row['upload_ts'], 0, 19));
     if (!$this->userPerm && 4 == $row['status_fk']) {
       $currentStatus = $this->statusTypes[4];
     } else {
@@ -213,22 +211,20 @@ class AjaxBrowse extends DefaultPlugin
     $rejectableUploadId = ($this->userPerm || $row['status_fk'] < 4) ? $uploadId : 0;
     $tripleComment = array($rejectableUploadId, $row['status_fk'], htmlspecialchars($row['status_comment']));
 
-    $sql = "SELECT rf_pk, rf_shortname FROM upload_clearing_license ucl, license_ref"
-            . " WHERE ucl.group_fk=$1 AND upload_fk=$2 AND ucl.rf_fk=rf_pk";
+    $sql = "SELECT rf_pk, rf_shortname FROM license_ref lf JOIN upload_clearing_license ucl"
+            . " ON lf.rf_pk=ucl.rf_fk WHERE upload_fk=$1 AND ucl.group_fk=$2";
     $stmt = __METHOD__.'.collectMainLicenses';
-    $this->dbManager->prepare($stmt, $sql);
-    $res = $this->dbManager->execute($stmt,array(Auth::getGroupId(),$uploadId));
+    $mainParams = array($uploadId, Auth::getGroupId());
+    $lic = $this->dbManager->getRows($sql, $mainParams, $stmt);
     $mainLicenses = array();
-    while ($lic=$this->dbManager->fetchArray($res)) {
+    foreach ($lic as $mainLic) {
       $mainLicenses[] = '<a onclick="javascript:window.open(\''.Traceback_uri()
-              ."?mod=popup-license&rf=$lic[rf_pk]','License text','width=600,height=400,toolbar=no,scrollbars=yes,resizable=yes');"
-              .'" href="javascript:;">'.$lic['rf_shortname'].'</a>'
-              ."<img onclick=\"removeMainLicense($uploadId,$lic[rf_pk]);\" class=\"delete\" src=\"images/space_16.png\" alt=\"\"/></img>";
+              ."?mod=popup-license&rf=$mainLic[rf_pk]','License text','width=600,height=400,toolbar=no,scrollbars=yes,resizable=yes');"
+              .'" href="javascript:;">'.$mainLic['rf_shortname'].'</a>'
+              ."<img onclick=\"removeMainLicense($uploadId,$mainLic[rf_pk]);\" class=\"delete\" src=\"images/space_16.png\" alt=\"\"/></img>";
     }
-    $this->dbManager->freeResult($res);
 
-    $output = array($nameColumn, $currentStatus, $tripleComment, implode(', ', $mainLicenses), $currentAssignee, $dateCol, $pairIdPrio);
-    return $output;
+    return array($nameColumn, $nameAction, $currentStatus, $tripleComment, implode(', ', $mainLicenses), $dateCol, $currentAssignee);
   }
 
   /**
@@ -249,7 +245,7 @@ class AjaxBrowse extends DefaultPlugin
 
   private function createSelect($id,$options,$select='',$action='')
   {
-    $html = "<select name=\"$id\" id=\"$id\" $action class=\"ui-render-select2\">";
+    $html = "<select class='form-control-sm' style=\"max-width:250px;\" name=\"$id\" id=\"$id\" $action class=\"ui-render-select2\">";
     foreach ($options as $key=>$disp) {
       $html .= '<option value="'.$key.'"';
       if ($key == $select) {
@@ -305,9 +301,7 @@ class AjaxBrowse extends DefaultPlugin
   {
     $columnNamesInDatabase = array('upload_filename', 'upload_clearing.status_fk', 'UNUSED', 'UNUSED', 'upload_clearing.assignee', 'upload_ts', 'upload_clearing.priority');
 
-    $orderString = $this->dataTablesUtility->getSortingString($_GET, $columnNamesInDatabase);
-
-    return $orderString;
+    return $this->dataTablesUtility->getSortingString($_GET, $columnNamesInDatabase);
   }
 
   private function getSearchString($searchPattern)

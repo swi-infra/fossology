@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
-Authors: Andreas Würl, Steffen Weber
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ Authors: Andreas Würl, Steffen Weber
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
@@ -128,6 +117,22 @@ class FolderDao
     return $rootFolder;
   }
 
+  /**
+   * @param int $userId
+   * @return Folder|null
+   */
+  public function getDefaultFolder($userId)
+  {
+    $statementName = __METHOD__;
+    $this->dbManager->prepare($statementName,
+      "SELECT f.* FROM folder f INNER JOIN users u ON f.folder_pk = u.default_folder_fk WHERE u.user_pk = $1");
+    $res = $this->dbManager->execute($statementName, array($userId));
+    $row = $this->dbManager->fetchArray($res);
+    $rootFolder = $row ? new Folder(intval($row['folder_pk']), $row['folder_name'], $row['folder_desc'], intval($row['folder_perm'])) : null;
+    $this->dbManager->freeResult($res);
+    return $rootFolder;
+  }
+
   public function getFolderTreeCte($parentId = null)
   {
     $parentCondition = $parentId ? 'folder_pk=$1' : 'folder_pk=' . self::TOP_LEVEL;
@@ -217,7 +222,7 @@ GROUP BY group_fk
 
     $allIds = array();
     for ($i=0; $i < sizeof($results); $i++) {
-      array_push($allIds, intval($results[$i]['folder_pk']));
+      $allIds[] = intval($results[$i]['folder_pk']);
     }
 
     return $allIds;
@@ -296,7 +301,7 @@ WHERE fc.parent_fk = $1 AND fc.foldercontents_mode = " . self::MODE_UPLOAD . " A
     return !empty($cycle);
   }
 
-  protected function getContent($folderContentId)
+  public function getContent($folderContentId)
   {
     $content = $this->dbManager->getSingleRow('SELECT * FROM foldercontents WHERE foldercontents_pk=$1',
       array($folderContentId),
@@ -384,7 +389,9 @@ WHERE fc.parent_fk = $1 AND fc.foldercontents_mode = " . self::MODE_UPLOAD . " A
     if ($this->isRemovableContent($content['child_id'], $content['foldercontents_mode'])) {
       $sql = "DELETE FROM foldercontents WHERE foldercontents_pk=$1";
       $this->dbManager->getSingleRow($sql, array($folderContentId), __METHOD__);
+      return true;
     }
+    return false;
   }
 
   public function removeContentById($uploadpk, $folderId)
@@ -397,8 +404,8 @@ WHERE fc.parent_fk = $1 AND fc.foldercontents_mode = " . self::MODE_UPLOAD . " A
   {
     $results = array();
     $stmtFolder = __METHOD__;
-    $sqlFolder = "SELECT foldercontents_pk,foldercontents_mode, folder_name FROM foldercontents,folder "
-      . "WHERE foldercontents.parent_fk=$1 AND foldercontents.child_id=folder.folder_pk"
+    $sqlFolder = "SELECT foldercontents_pk,foldercontents_mode, folder_name FROM foldercontents JOIN folder"
+      . " ON foldercontents.child_id=folder.folder_pk WHERE foldercontents.parent_fk=$1"
       . " AND foldercontents_mode=" . self::MODE_FOLDER;
     $this->dbManager->prepare($stmtFolder, $sqlFolder);
     $res = $this->dbManager->execute($stmtFolder, array($folderId));
@@ -444,13 +451,14 @@ WHERE fc.parent_fk = $1 AND fc.foldercontents_mode = " . self::MODE_UPLOAD . " A
   /**
    * Get the folder contents id for a given child id
    * @param integer $childId Id of the child
+   * @param integer $mode    Mode of child
    * @return NULL|integer Folder content id if success, NULL otherwise
    */
-  public function getFolderContentsId($childId)
+  public function getFolderContentsId($childId, $mode)
   {
     $folderContentsRow = $this->dbManager->getSingleRow(
       'SELECT foldercontents_pk FROM foldercontents '.
-      'WHERE child_id = $1', [$childId]);
+      'WHERE child_id = $1 AND foldercontents_mode = $2', [$childId, $mode]);
     if (!$folderContentsRow) {
       return null;
     }

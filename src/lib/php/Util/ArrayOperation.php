@@ -1,19 +1,8 @@
 <?php
 /*
-Copyright (C) 2014, Siemens AG
+ SPDX-FileCopyrightText: © 2014 Siemens AG
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Util;
@@ -66,5 +55,23 @@ class ArrayOperation
       }
     }
     return false;
+  }
+
+  /**
+   * @brief Check if a list of keys exists in associative array.
+   *
+   * This function takes a list of keys which should appear in an associative
+   * array. The function flips the key array to make it as an associative array.
+   * It then uses the array_diff_key() to compare the two arrays.
+   *
+   * @param array $array Associative array to check keys against
+   * @param array $keys  Array of keys to check
+   * @return boolean True if all keys exists, false otherwise.
+   * @uses array_flip()
+   * @uses array_diff_key()
+   */
+  public static function arrayKeysExists(array $array, array $keys): bool
+  {
+    return !array_diff_key(array_flip($keys), $array);
   }
 }

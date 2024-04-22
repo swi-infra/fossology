@@ -1,21 +1,10 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2012 Hewlett-Packard Development Company, L.P.
- Copyright (C) 2018 Siemens AG
+/*
+ SPDX-FileCopyrightText: © 2008-2012 Hewlett-Packard Development Company, L.P.
+ SPDX-FileCopyrightText: © 2018 Siemens AG
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- ***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 
 /**
  * \file
@@ -115,7 +104,7 @@ function AgentCheckBoxMake($upload_pk,$SkipAgents=array(), $specified_username =
         } else {
           $Selected = "";
         }
-        $V .= "<input type='checkbox' name='Check_$Name' value='1' $Selected />$Desc<br />\n";
+        $V .= "<input type='checkbox' class='browse-upload-checkbox view-license-rc-size' name='Check_$Name' value='1' $Selected /> $Desc<br />\n";
       }
     }
   }
@@ -351,7 +340,7 @@ function AgentSelect($TableName, $upload_pk, $SLName, &$agent_pk, $extra = "")
     if (empty($agent_pk)) {
       $select .= " SELECTED ";
       $agent_pk = $row["agent_pk"];
-    } else if ($agent_pk == $row['agent_pk']) {
+    } else if (in_array($row['agent_pk'], $agent_pk)) {
       $select .= " SELECTED ";
     }
 
@@ -369,9 +358,9 @@ function AgentSelect($TableName, $upload_pk, $SLName, &$agent_pk, $extra = "")
  *
  * \return String $agentsChecked list of checked agents
  */
-function userAgents()
+function userAgents($agents=null)
 {
-  return implode(',', array_keys(checkedAgents()));
+  return implode(',', array_keys(checkedAgents($agents)));
 }
 
 /**
@@ -380,13 +369,19 @@ function userAgents()
  *
  * \return Plugin[] list of checked agent plugins, mapped by name
  */
-function checkedAgents()
+function checkedAgents($agents=null)
 {
   $agentsChecked = array();
   $agentList = listAgents();
   foreach ($agentList as $agentName => &$agentPlugin) {
-    if (GetParm("Check_" . $agentName, PARM_INTEGER) == 1) {
-      $agentsChecked[$agentName] = &$agentPlugin;
+    if (is_null($agents)) {
+      if (GetParm("Check_" . $agentName, PARM_INTEGER) == 1) {
+        $agentsChecked[$agentName] = &$agentPlugin;
+      }
+    } else {
+      if ($agents["Check_" . $agentName] == 1) {
+        $agentsChecked[$agentName] = &$agentPlugin;
+      }
     }
   }
   unset($agentPlugin);

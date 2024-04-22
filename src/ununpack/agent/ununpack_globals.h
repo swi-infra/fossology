@@ -1,19 +1,8 @@
-/*******************************************************************
- Copyright (C) 2011-2014 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011-2014 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- *******************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * \file
  * \brief Contains global declaration of variables
@@ -78,7 +67,9 @@ cmdlist CMD[] =
 /* 3 */ { "application/x-compress","zcat","","> '%s' 2>/dev/null","",CMD_PACK,1,0177000,0177000, },
 /* 4 */ { "application/x-bzip","bzcat","","> '%s' 2>/dev/null","",CMD_PACK,1,0177000,0177000, },
 /* 5 */ { "application/x-bzip2","bzcat","","> '%s' 2>/dev/null","",CMD_PACK,1,0177000,0177000, },
+#if UPX_SUPPORT
 /* 6 */ { "application/x-upx","upx","-d -o'%s'",">/dev/null 2>&1","",CMD_PACK,1,0177000,0177000, },
+#endif
 /* 7 */ { "application/pdf","pdftotext","-htmlmeta","'%s' >/dev/null 2>&1","",CMD_PACK,1,0100000,0100000, },
 /* 8 */ { "application/x-pdf","pdftotext","-htmlmeta","'%s' >/dev/null 2>&1","",CMD_PACK,1,0100000,0100000, },
 /* 9 */ { "application/x-zip","unzip","-q -P none -o","-x / >/dev/null 2>&1","unzip -Zhzv '%s' > '%s'",CMD_ARC,1,0177000,0177000, },
@@ -105,7 +96,11 @@ cmdlist CMD[] =
 /* 30 */{ "application/jar","unzip","-q -P none -o","-x / >/dev/null 2>&1","unzip -Zhzv '%s' > '%s'",CMD_ARC,1,0177000,0177000, },
 /* 31 */{ "application/java-archive","unzip","-q -P none -o","-x / >/dev/null 2>&1","unzip -Zhzv '%s' > '%s'",CMD_ARC,1,0177000,0177000, },
 /* 32 */{ "application/x-dosexec","7z","x -y -pjunk",">/dev/null 2>&1","",CMD_ARC,1,0177000,0177000, },
-/* 33 */{ "","","",">/dev/null 2>&1","",CMD_DEFAULT,1,0177000,0177000, },
+/* 33 */{ "application/vnd.debian.binary-package","ar","x",">/dev/null 2>&1","dpkg -I '%s' > '%s'",CMD_AR,1,0177000,0177777, },
+/* 34 */{ "application/zstd", "zstd", "-d", ">/dev/null 2>&1", "zstd -lv '%s' > '%s'", CMD_ZSTD, 1, 0177000, 0177000, },
+/* 35 */{ "application/x-lz4", "zstd", "-d", ">/dev/null 2>&1", "", CMD_ZSTD, 1, 0177000, 0177000, },
+/* 36 */{ "application/x-lzma", "zstd", "-d", ">/dev/null 2>&1", "", CMD_ZSTD, 1, 0177000, 0177000, },
+/* 37 */{ "","","",">/dev/null 2>&1","",CMD_DEFAULT,1,0177000,0177000, },
   { NULL,NULL,NULL,NULL,NULL,-1,-1,0177000,0177000, },
 };
 #endif

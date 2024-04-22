@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2014, Siemens AG
-Author: Andreas Würl
+ SPDX-FileCopyrightText: © 2014 Siemens AG
+ Author: Andreas Würl
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Data;
@@ -24,15 +13,16 @@ class LicenseRefTest extends \PHPUnit\Framework\TestCase
   private $id = 321;
   private $shortName = "<shortName>";
   private $fullName = "<fullName>";
+  private $spdxId = "<spdxId>";
 
   /**
    * @var LicenseRef
    */
   private $licenseRef;
 
-  protected function setUp()
+  protected function setUp() : void
   {
-    $this->licenseRef = new LicenseRef($this->id, $this->shortName, $this->fullName);
+    $this->licenseRef = new LicenseRef($this->id, $this->shortName, $this->fullName, $this->spdxId);
   }
 
   public function testGetId()
@@ -48,5 +38,16 @@ class LicenseRefTest extends \PHPUnit\Framework\TestCase
   public function testGetFullName()
   {
     assertThat($this->licenseRef->getFullName(), is($this->fullName));
+  }
+
+  public function testGetSpdxId()
+  {
+    assertThat($this->licenseRef->getSpdxId(), is($this->spdxId));
+  }
+
+  public function testDefaultSpdxId()
+  {
+    $licenseRef = new LicenseRef($this->id, $this->shortName, $this->fullName, "");
+    assertThat($licenseRef->getSpdxId(), is(LicenseRef::SPDXREF_PREFIX_FOSSOLOGY . $this->shortName));
   }
 }

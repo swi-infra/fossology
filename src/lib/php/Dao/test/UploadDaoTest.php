@@ -1,26 +1,18 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
-Author: Steffen Weber, Johannes Najjar
+ SPDX-FileCopyrightText: © 2014-2015 Siemens AG
+ Author: Steffen Weber, Johannes Najjar
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
 
+use DateTime;
+use Exception;
 use Fossology\Lib\Data\Tree\Item;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
+use Fossology\Lib\Data\Upload\UploadEvents;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Test\TestPgDb;
 use Mockery as M;
@@ -34,12 +26,13 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
   /** @var UploadDao */
   private $uploadDao;
 
-  protected function setUp()
+  protected function setUp() : void
   {
     $this->testDb = new TestPgDb();
     $this->dbManager = &$this->testDb->getDbManager();
 
-    $this->testDb->createPlainTables(array('upload','uploadtree'));
+    $this->testDb->createPlainTables(array('upload', 'uploadtree',
+      'report_info', 'upload_events'));
 
     $this->dbManager->prepare($stmt = 'insert.upload',
         "INSERT INTO upload (upload_pk, uploadtree_tablename) VALUES ($1, $2)");
@@ -55,7 +48,7 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
   }
 
-  protected function tearDown()
+  protected function tearDown() : void
   {
     $this->addToAssertionCount(\Hamcrest\MatcherAssert::getCount()-$this->assertCountBefore);
     $this->testDb = null;
@@ -183,7 +176,6 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @param $subentries
-   * @return array
    */
   protected function prepareModularTable($subentries = array())
   {
@@ -432,20 +424,18 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
     assertThat($topId,equalTo(3650));
   }
 
-  /** @expectedException \Exception
-   * @expectedExceptionMessage Missing upload tree parent for upload
-   */
   public function testGetUploadParentFromBrokenTree()
   {
+    $this->expectException(Exception::class);
+    $this->expectExceptionMessage("Missing upload tree parent for upload");
     $this->prepareUploadTree(array(array(4651, 3650, 33, 0, 805323776, 2, 75, 'artifact.dir')));
     $this->uploadDao->getUploadParent(33);
   }
 
-  /** @expectedException \Exception
-   * @expectedExceptionMessage Missing upload tree parent for upload
-   */
   public function testGetUploadParentFromNonExistingTree()
   {
+    $this->expectException(Exception::class);
+    $this->expectExceptionMessage("Missing upload tree parent for upload");
     $this->uploadDao->getUploadParent(34);
   }
 
@@ -454,9 +444,9 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
     $this->testDb->createPlainTables(array('pfile'));
     $this->dbManager->queryOnce('TRUNCATE upload');
     $this->testDb->insertData(array('upload','pfile'));
-    // (pfile_pk, pfile_md5, pfile_sha1, pfile_size) := (9, 'F703E0197FB6C5BD0C8DFDCC115A0231', '5DAFC9C82988A81413B995210B668CF5CF5975FF', 16845)
-    $hashes = $this->uploadDao->getUploadHashes(2);
-    assertThat($hashes,equalTo(array('md5'=>'F703E0197FB6C5BD0C8DFDCC115A0231','sha1'=>'5DAFC9C82988A81413B995210B668CF5CF5975FF')));
+    // (pfile_pk, pfile_md5, pfile_sha1, pfile_sha256, pfile_size) := (755, 'E7295A5773D0EA17D53CBE6293924DD4', '93247C8DB814F0A224B75B522C1FA4DC92DC3078', 'E29ABC32DB8B6241D598BC7C76681A7623D176D85F99E738A56C0CB684C367E1', 10240)
+    $hashes = $this->uploadDao->getUploadHashes(44);
+    assertThat($hashes,equalTo(array('md5'=>'E7295A5773D0EA17D53CBE6293924DD4','sha1'=>'93247C8DB814F0A224B75B522C1FA4DC92DC3078','sha256'=>'E29ABC32DB8B6241D598BC7C76681A7623D176D85F99E738A56C0CB684C367E1')));
   }
 
   public function testGetFatItem()
@@ -480,5 +470,63 @@ class UploadDaoTest extends \PHPUnit\Framework\TestCase
 
     $fatM = $this->uploadDao->getFatItemId(3654, 32, 'uploadtree');
     assertThat($fatM, equalTo($itemM1a));
+  }
+
+  /**
+   * @test
+   *
+   * Test if getAssigneeDate() is giving assigning date, not closing date.
+   * -# Create an upload event with type ASSIGN_EVENT and one timestamp.
+   * -# Create another upload event with different type and different timestamp.
+   * -# Test if timestamp matches.
+   * -# Test if event does not exist, return value is null.
+   */
+  public function testGetAssigneeDate()
+  {
+    $time_now = new DateTime();
+    $time_1_day = DateTime::createFromFormat("U",
+      strtotime($time_now->format(DATE_ATOM) . " +1 day"));
+    $this->dbManager->insertTableRow("upload_events", [
+      "upload_fk" => 2,
+      "event_ts" => $time_now->format(DATE_ATOM),
+      "event_type" => UploadEvents::ASSIGNEE_EVENT
+    ]);
+    $this->dbManager->insertTableRow("upload_events", [
+      "upload_fk" => 2,
+      "event_ts" => $time_1_day->format(DATE_ATOM),
+      "event_type" => UploadEvents::UPLOAD_CLOSED_EVENT
+    ]);
+    $assigneeDate = $this->uploadDao->getAssigneeDate(2);
+    assertThat(strtotime($assigneeDate), equalTo($time_now->getTimestamp()));
+    self::assertThat($this->uploadDao->getAssigneeDate(3), self::equalTo(null));
+  }
+
+  /**
+   * @test
+   *
+   * Test if getClosedDate() is giving close date, not other date.
+   * -# Create an upload event with type UPLOAD_CLOSED_EVENT and one timestamp.
+   * -# Create another upload event with different type and different timestamp.
+   * -# Test if timestamp matches.
+   * -# Test if event does not exist, return value is null.
+   */
+  public function testGetClosedDate()
+  {
+    $time_now = new DateTime();
+    $time_1_day = DateTime::createFromFormat("U",
+      strtotime($time_now->format(DATE_ATOM) . " +1 day"));
+    $this->dbManager->insertTableRow("upload_events", [
+      "upload_fk" => 2,
+      "event_ts" => $time_now->format(DATE_ATOM),
+      "event_type" => UploadEvents::ASSIGNEE_EVENT
+    ]);
+    $this->dbManager->insertTableRow("upload_events", [
+      "upload_fk" => 2,
+      "event_ts" => $time_1_day->format(DATE_ATOM),
+      "event_type" => UploadEvents::UPLOAD_CLOSED_EVENT
+    ]);
+    $assigneeDate = $this->uploadDao->getClosedDate(2);
+    assertThat(strtotime($assigneeDate), equalTo($time_1_day->getTimestamp()));
+    self::assertThat($this->uploadDao->getClosedDate(3), self::equalTo(null));
   }
 }

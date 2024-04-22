@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2019 Orange
+/*
+ SPDX-FileCopyrightText: © 2019 Orange
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 define("TITLE_DASHBOARD_STATISTICS", _("Statistics Dashboard"));
 
@@ -40,12 +29,12 @@ class dashboardReporting extends FO_Plugin
   /**
    * \brief Lists number of ever quequed jobs per job type (agent)..
    */
-  function CountAllJobs()
+  function CountAllJobs($fromRest = false)
   {
     $query = "SELECT ag.agent_name,ag.agent_desc,count(jq.*) AS fired_jobs ";
     $query.= "FROM agent ag LEFT OUTER JOIN jobqueue jq ON (jq.jq_type = ag.agent_name) ";
     $query.= "GROUP BY ag.agent_name,ag.agent_desc ORDER BY fired_jobs DESC;";
-
+    $restRes = [];
     $rows = $this->dbManager->getRows($query);
 
     $V = "<table border=1>";
@@ -53,10 +42,18 @@ class dashboardReporting extends FO_Plugin
 
     foreach ($rows as $agData) {
       $V .= "<tr><td>".$agData['agent_name']."</td><td>".$agData['agent_desc']."</td><td align='right'>".$agData['fired_jobs']."</td></tr>";
+      $restRes[] = [
+        'agentName' => $agData['agent_name'],
+        'agentDesc' => $agData['agent_desc'],
+        'firedJobs' => intval($agData['fired_jobs']),
+      ];
     }
 
     $V .= "</table>";
 
+    if ($fromRest) {
+      return $restRes;
+    }
     return $V;
   }
 

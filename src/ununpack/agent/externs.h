@@ -1,19 +1,8 @@
-/*******************************************************************
- Copyright (C) 2011 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2011 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- *******************************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 /**
  * \file
  * \brief Stores all extern variables used by the agent
@@ -27,7 +16,7 @@ extern int UnlinkSource;        ///< Remove recursive sources after unpacking?
 extern int UnlinkAll;           ///< Remove ALL unpacked files when done (clean up)?
 extern int ForceContinue;       ///< Force continue when unpack tool fails?
 extern int ForceDuplicate;      ///< When using db, should it process duplicates?
-extern int IgnoreSCMData;       ///< 1: Ignore SCM data, 0: dont ignore it.
+extern int IgnoreSCMData;       ///< 1: Ignore SCM data, 0: dont ignore it.
 extern int PruneFiles;          ///< Remove links? >1 hard links, zero files, etc
 extern int SetContainerArtifact;  ///< Should initial container be an artifact?
 extern FILE *ListOutFile;       ///< File to store unpack list

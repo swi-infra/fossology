@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2013-2015 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2013-2015 Hewlett-Packard Development Company, L.P.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 /**
  * \file admin_tag.php
@@ -119,8 +108,7 @@ class admin_tag extends FO_Plugin
    */
   function ShowCreateTagPage()
   {
-    $VC = "";
-    $VC .= _("<h3>Create Tag:</h3>\n");
+    $VC = _("<h3>Create Tag:</h3>\n");
     $VC.= "<form name='form' method='POST' action='" . Traceback_uri() ."?mod=admin_tag'>\n";
     $VC .= "<p>";
     $text = _("Tag");

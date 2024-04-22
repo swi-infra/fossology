@@ -1,21 +1,9 @@
 <?php
 /*
- Copyright (C) 2015-2018, Siemens AG
- Author: Shaheem Azmal<shaheem.azmal@siemens.com>,
-         Anupam Ghosh <anupam.ghosh@siemens.com>
+ SPDX-FileCopyrightText: © 2015-2018 Siemens AG
+ Author: Shaheem Azmal<shaheem.azmal@siemens.com>, Anupam Ghosh <anupam.ghosh@siemens.com>
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Dao;
@@ -245,8 +233,7 @@ class ShowJobsDao
    **/
   public function getNumItemsPerSec($itemsprocessed, $numSecs)
   {
-    $filesPerSec = ($numSecs > 0) ? $itemsprocessed/$numSecs : 0;
-    return $filesPerSec;
+    return ($numSecs > 0) ? $itemsprocessed/$numSecs : 0;
   }
 
   /**
@@ -255,7 +242,7 @@ class ShowJobsDao
    * @param string $jq_Type
    * @param float $filesPerSec
    * @param int $uploadId
-   * @return Returns empty if estimated time is 0 else returns time.
+   * @return string Returns empty if estimated time is 0 else returns time.
    **/
   public function getEstimatedTime($job_pk, $jq_Type='', $filesPerSec=0, $uploadId=0, $timeInSec=0)
   {
@@ -283,13 +270,12 @@ class ShowJobsDao
         $statementName = __METHOD__."$selectCol.$removeType";
         $this->dbManager->prepare($statementName,
         "SELECT $selectCol FROM jobqueue WHERE $removeType jq_job_fk =$1 ORDER BY jq_type DESC");
-        $result = $this->dbManager->execute($statementName, array($job_pk));
       } else {
         $statementName = __METHOD__."$selectCol.$jq_Type";
         $this->dbManager->prepare($statementName,
         "SELECT $selectCol FROM jobqueue WHERE jq_type LIKE '$jq_Type' AND jq_job_fk =$1");
-        $result = $this->dbManager->execute($statementName, array($job_pk));
       }
+      $result = $this->dbManager->execute($statementName, array($job_pk));
       $estimatedArray = array(); // estimate time for each agent
 
       while ($row = $this->dbManager->fetchArray($result)) {
@@ -303,7 +289,7 @@ class ShowJobsDao
           if (!empty($filesPerSec)) {
             $timeOfCompletion = ($itemCount['jq_itemsprocessed'] - $row['jq_itemsprocessed']) / $filesPerSec;
           }
-          array_push($estimatedArray, $timeOfCompletion);
+          $estimatedArray[] = $timeOfCompletion;
         }
       }
       if (empty($estimatedArray)) {
@@ -320,8 +306,8 @@ class ShowJobsDao
 
   /**
    * @brief Return total Job data with time elapsed
-   * @param $job_pk
-   * @return $row
+   * @param $jq_pk
+   * @return array
    */
   public function getDataForASingleJob($jq_pk)
   {
@@ -335,8 +321,8 @@ class ShowJobsDao
   } /* getDataForASingleJob */
 
   /**
-   * @brief Return boolean
-   * @param $jq_pk
+   * @param $jqPk
+   * @return bool
    */
   public function getJobStatus($jqPk)
   {
@@ -354,9 +340,9 @@ class ShowJobsDao
   }
 
   /**
-   * @brief Return array
-   * @param $jobId
    * @param $jqType
+   * @param $jobId
+   * @return array
    */
   public function getItemsProcessedForDecider($jqType, $jobId)
   {
@@ -371,5 +357,23 @@ class ShowJobsDao
     } else {
       return array();
     }
+  }
+
+  /**
+   * Get the status of all recent pending or running jobs.
+   * @return array Containing job name, number of jobs pending and running
+   */
+  public function getJobsForAll()
+  {
+    $sql = "SELECT jq_type AS job, jq_job_fk, job_upload_fk AS upload_fk, " .
+      "CASE WHEN (jq_endtext IS NULL AND jq_end_bits = 0) THEN 'pending' " .
+      "WHEN (jq_endtext = ANY('{Started,Restarted,Paused}')) THEN 'running' " .
+      "ELSE '' END AS status " .
+      "FROM jobqueue INNER JOIN job " .
+      "ON jq_job_fk = job_pk " .
+      "AND job_queued >= (now() - interval '" . $this->nhours . " hours') " .
+      "WHERE jq_endtime IS NULL;";
+    $statement = __METHOD__ . ".getAllUnFinishedJobs";
+    return $this->dbManager->getRows($sql, [], $statement);
   }
 }

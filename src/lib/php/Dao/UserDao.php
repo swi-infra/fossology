@@ -1,21 +1,12 @@
 <?php
-/***********************************************************
- * Copyright (C) 2014-2017 Siemens AG
- * Author: J. Najjar, S. Weber, A. Wührl
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ***********************************************************/
+/*
+ SPDX-FileCopyrightText: © 2014-2017 Siemens AG
+ Author: J. Najjar, S. Weber, A. Wührl
+ SPDX-FileCopyrightText: © 2021-2022 Orange
+ Contributors: Piotr Pszczola, Bartlomiej Drozdz
+
+ SPDX-License-Identifier: GPL-2.0-only
+*/
 
 namespace Fossology\Lib\Dao;
 
@@ -29,6 +20,8 @@ class UserDao
   const USER = 0;
   const ADMIN = 1;
   const ADVISOR = 2;
+
+  const USER_ACTIVE_STATUS = 'active';
 
   const SUPER_USER = 'fossy';
 
@@ -59,7 +52,7 @@ class UserDao
     $userChoices = array();
     $statementN = __METHOD__;
     $sql = "SELECT user_pk, user_name, user_desc FROM users LEFT JOIN group_user_member AS gum ON users.user_pk = gum.user_fk"
-            . " WHERE gum.group_fk = $1";
+            . " WHERE gum.group_fk = $1 AND users.user_status='active'";
     $this->dbManager->prepare($statementN, $sql);
     $res = $this->dbManager->execute($statementN, array($groupId));
     while ($rw = $this->dbManager->fetchArray($res)) {
@@ -192,9 +185,6 @@ class UserDao
   function updateUserTable()
   {
     $statementBasename = __FUNCTION__;
-    $this->dbManager->getSingleRow("UPDATE users SET user_seed = $1 WHERE user_seed IS NULL;",
-            array(rand()),
-            $statementBasename . '.randomizeEmptySeeds');
 
     /* No users with no seed and no perm -- make them read-only */
     $this->dbManager->getSingleRow("UPDATE users SET user_perm = $1 WHERE user_perm IS NULL;",
@@ -216,15 +206,15 @@ class UserDao
     $row = $this->getUserByPermission($perm);
     if (empty($row['user_name'])) {
       /* No user with PLUGIN_DB_ADMIN access. */
-      $seed = rand() . rand();
-      $hash = sha1($seed . self::SUPER_USER);
+      $options = array('cost' => 10);
+      $hash = password_hash(self::SUPER_USER, PASSWORD_DEFAULT, $options);
       $row0 = $this->getUserByName(self::SUPER_USER);
 
       if (empty($row0['user_name'])) {
         $this->dbManager->getSingleRow("
           INSERT INTO users (user_name, user_desc, user_seed, user_pass, user_perm, user_email, email_notify, root_folder_fk)
             VALUES ($1,'Default Administrator',$2, $3, $4, $1,'y',1)",
-            array(self::SUPER_USER, $seed, $hash, $perm), $statementBasename . '.createDefaultAdmin');
+            array(self::SUPER_USER, 'Seed', $hash, $perm), $statementBasename . '.createDefaultAdmin');
       } else {
         $this->dbManager->getSingleRow("UPDATE users SET user_perm = $1, email_notify = 'y'," .
             " user_email=$2 WHERE user_name =$2",
@@ -283,14 +273,24 @@ class UserDao
         array($userId, $groupId), __FUNCTION__);
   }
 
-  public function getUserAndDefaultGroupByUserName($userName)
+  public function getUserAndDefaultGroupByUserName(&$userName, $oauth=false)
   {
+    $searchEmail = " ";
+    $statement = __METHOD__;
+    if ($oauth) {
+      $searchEmail = " OR user_email=$1";
+      $statement .= "oauth";
+    }
     $userRow = $this->dbManager->getSingleRow(
-        "SELECT users.*,group_name FROM users LEFT JOIN groups ON group_fk=group_pk WHERE user_name=$1",
-        array($userName), __FUNCTION__);
+        "SELECT users.*,group_name FROM users LEFT JOIN groups ON group_fk=group_pk WHERE user_name=$1$searchEmail",
+        array($userName), $statement);
     if (empty($userRow)) {
       throw new \Exception('invalid user name');
     }
+    if ($oauth) {
+      $userName = $userRow['user_name'];
+    }
+    $userRow['oauth'] = $oauth;
     if ($userRow['group_fk']) {
       return $userRow;
     }
@@ -299,6 +299,37 @@ class UserDao
     $userRow['group_fk'] = $groupRow['group_fk'];
     $userRow['group_name'] = $groupRow['group_name'];
     return $userRow;
+  }
+
+  /**
+   * @param string $userName
+   * @return boolean true if user status=active
+   */
+  public function isUserActive($userName)
+  {
+    $row = $this->dbManager->getSingleRow("SELECT user_status FROM users WHERE user_name=$1",
+        array($userName), __METHOD__);
+    return $row!==false && ($row['user_status']==self::USER_ACTIVE_STATUS);
+  }
+
+  /**
+   * @param int $userId
+   * @return boolean true if user status=active
+   */
+  public function isUserIdActive($userId)
+  {
+    $row = $this->dbManager->getSingleRow("SELECT user_status FROM users WHERE user_pk=$1",
+        array($userId), __METHOD__);
+    return $row!==false && ($row['user_status']==self::USER_ACTIVE_STATUS);
+  }
+
+  /**
+   * @param int $userId
+   */
+  public function updateUserLastConnection($userId)
+  {
+    $this->dbManager->getSingleRow("UPDATE users SET last_connection=now() WHERE user_pk=$1",
+        array($userId), __FUNCTION__);
   }
 
   /**
@@ -342,11 +373,11 @@ class UserDao
       throw new \Exception(_("Error: Group name must be specified."));
     }
 
-    $groupAlreadyExists = $this->dbManager->getSingleRow("SELECT group_pk FROM groups WHERE group_name=$1",
+    $groupAlreadyExists = $this->dbManager->getSingleRow("SELECT group_pk, group_name FROM groups WHERE LOWER(group_name)=LOWER($1)",
             array($groupName),
             __METHOD__.'.gExists');
     if ($groupAlreadyExists) {
-      throw new \Exception(_("Group already exists.  Not added."));
+      throw new \Exception(_("Group exists. Try different Name, Group-Name checking is case-insensitive and Duplicate not allowed"));
     }
 
     $this->dbManager->insertTableRow('groups', array('group_name'=>$groupName));
@@ -359,10 +390,10 @@ class UserDao
     return $groupNowExists['group_pk'];
   }
 
-  public function addGroupMembership($groupId, $userId)
+  public function addGroupMembership($groupId, $userId, $groupPerm=1)
   {
     $this->dbManager->insertTableRow('group_user_member',
-            array('group_fk'=>$groupId,'user_fk'=>$userId,'group_perm'=>1));
+            array('group_fk'=>$groupId,'user_fk'=>$userId,'group_perm'=>$groupPerm));
   }
 
   /**
@@ -402,5 +433,14 @@ class UserDao
       throw new \Exception('unknown user with id='.$userId);
     }
     return $userRow['user_email'];
+  }
+
+  /**
+   * Get all users from users table
+   * @return array
+   */
+  public function getAllUsers()
+  {
+    return $this->dbManager->getRows("SELECT * FROM users ORDER BY user_name;");
   }
 }

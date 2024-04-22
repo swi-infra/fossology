@@ -1,20 +1,9 @@
 <?php
 /*
-Copyright (C) 2014-2016, Siemens AG
-Author: Andreas Würl
+ SPDX-FileCopyrightText: © 2014-2016 Siemens AG
+ Author: Andreas Würl
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ SPDX-License-Identifier: GPL-2.0-only
 */
 
 namespace Fossology\Lib\Plugin;
@@ -295,7 +284,7 @@ abstract class DefaultPlugin implements Plugin
 
     $startTime = microtime(true);
 
-    $content = $this->renderer->loadTemplate($templateName)
+    $content = $this->renderer->load($templateName)
         ->render($vars ?: $this->getDefaultVars());
 
     $this->logger->debug(sprintf("%s: render response in %.3fs", get_class($this), microtime(true) - $startTime));
@@ -347,6 +336,7 @@ abstract class DefaultPlugin implements Plugin
 
     $metadata = "<meta name='description' content='The study of Open Source'>\n";
     $metadata .= "<meta http-equiv='Content-Type' content='text/html;charset=UTF-8'>\n";
+    $metadata .= "<meta name='viewport' content='width=device-width,initial-scale=1.0'>\n";
 
     $vars['metadata'] = $metadata;
 
@@ -358,6 +348,8 @@ abstract class DefaultPlugin implements Plugin
     $styles .= "<link rel='stylesheet' href='css/select2.min.css'>\n";
     $styles .= "<link rel='stylesheet' href='css/jquery.dataTables.css'>\n";
     $styles .= "<link rel='stylesheet' href='css/fossology.css'>\n";
+    $styles .= "<link rel='stylesheet' href='css/bootstrap/bootstrap.min.css'>\n";
+    $styles .= "<link rel='stylesheet' href='css/bootstrap-icons.css'>\n";
     $styles .= "<link rel='icon' type='image/x-icon' href='favicon.ico'>\n";
     $styles .= "<link rel='shortcut icon' type='image/x-icon' href='favicon.ico'>\n";
 

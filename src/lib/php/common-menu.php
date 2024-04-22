@@ -1,20 +1,9 @@
 <?php
-/***********************************************************
- Copyright (C) 2008-2012 Hewlett-Packard Development Company, L.P.
+/*
+ SPDX-FileCopyrightText: © 2008-2012 Hewlett-Packard Development Company, L.P.
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
-
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- ***********************************************************/
+ SPDX-License-Identifier: LGPL-2.1-only
+*/
 /**
  * \file
  * \brief Common menu functions
@@ -70,7 +59,7 @@ $MenuMaxDepth = 0;    ///< How deep is the tree (for UI display)
  */
 function MenuPage($Page, $TotalPage, $Uri = '')
 {
-  $V = "<font class='text'><center>";
+  $V = "<ul class='pagination pagination-sm justify-content-center'>";
   if (empty($Uri)) {
     $Uri = Traceback();
   }
@@ -79,8 +68,8 @@ function MenuPage($Page, $TotalPage, $Uri = '')
   if ($Page > 0) {
     $text = _("First");
     $text1 = _("Prev");
-    $V.= "<a href='$Uri&page=0'>[$text]</a> ";
-    $V.= "<a href='$Uri&page=" . ($Page - 1) . "'>[$text1]</a> ";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=0'>$text</a></li>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=" . ($Page - 1) . "'>$text1</a></li>";
     if ($Page > 9) {
       $V.= " ... ";
     }
@@ -88,14 +77,14 @@ function MenuPage($Page, $TotalPage, $Uri = '')
   /* Create previous list page */
   for ($i = $Page - 9;$i < $Page;$i++) {
     if ($i >= 0) {
-      $V.= "<a href='$Uri&page=$i'>" . ($i + 1) . "</a> ";
+      $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=$i'>" . ($i + 1) . "</a></li>";
     }
   }
   /* Show current page number */
-  $V.= "<b>" . ($Page + 1) . "</b>";
+  $V.= "<li class='page-item active'><a class='page-link' href='#'>" . ($Page + 1) . "</a></li>";
   /* Create next page */
   for ($i = $Page + 1;($i <= $TotalPage) && ($i < $Page + 9);$i++) {
-    $V.= " <a href='$Uri&page=$i'>" . ($i + 1) . "</a>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=$i'>" . ($i + 1) . "</a></li>";
   }
   if ($Page < $TotalPage) {
     if ($Page < $TotalPage - 9) {
@@ -103,10 +92,10 @@ function MenuPage($Page, $TotalPage, $Uri = '')
     }
     $text = _("Next");
     $text1 = _("Last");
-    $V.= " <a href='$Uri&page=" . ($Page + 1) . "'>[$text]</a>";
-    $V.= " <a href='$Uri&page=" . ($TotalPage) . "'>[$text1]</a>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=" . ($Page + 1) . "'>$text</a></li>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=" . ($TotalPage) . "'>$text1</a></li>";
   }
-  $V.= "</center></font>";
+  $V.= "</ul>";
   return ($V);
 } // MenuPage
 
@@ -121,7 +110,7 @@ function MenuPage($Page, $TotalPage, $Uri = '')
  */
 function MenuEndlessPage($Page, $Next = 1, $Uri = '')
 {
-  $V = "<font class='text'><center>";
+  $V = "<center><ul class='pagination pagination-sm justify-content-center'>";
   if (empty($Uri)) {
     $Uri = Traceback();
   }
@@ -130,8 +119,8 @@ function MenuEndlessPage($Page, $Next = 1, $Uri = '')
   if ($Page > 0) {
     $text = _("First");
     $text1 = _("Prev");
-    $V.= "<a href='$Uri&page=0'>[$text]</a> ";
-    $V.= "<a href='$Uri&page=" . ($Page - 1) . "'>[$text1]</a> ";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=0'>$text</a></li>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=" . ($Page - 1) . "'>$text1</a></li>";
     if ($Page > 9) {
       $V.= " ... ";
     }
@@ -139,19 +128,19 @@ function MenuEndlessPage($Page, $Next = 1, $Uri = '')
   /* Create previous list page */
   for ($i = $Page - 9;$i < $Page;$i++) {
     if ($i >= 0) {
-      $V.= "<a href='$Uri&page=$i'>" . ($i + 1) . "</a> ";
+      $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=$i'>" . ($i + 1) . "</a></li>";
     }
   }
   /* Show current page number */
-  $V.= "<b>" . ($Page + 1) . "</b>";
+  $V.= "<li class='page-item active'><a class='page-link' href='#'>" . ($Page + 1) . "</a></li>";
   /* Create next page */
   if ($Next) {
     $text = _("Next");
     $i = $Page + 1;
-    $V.= " <a href='$Uri&page=$i'>" . ($i + 1) . "</a>";
-    $V.= " ... <a href='$Uri&page=$i'>[$text]</a>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=$i'>" . ($i + 1) . "</a></li>";
+    $V.= "<li class='page-item'><a class='page-link' href='$Uri&page=$i'>$text</a></li>";
   }
-  $V.= "</center></font>";
+  $V.= "</ul></center>";
   return ($V);
 } // MenuEndlessPage()
 
@@ -165,7 +154,7 @@ function MenuEndlessPage($Page, $Next = 1, $Uri = '')
  *         1  a < b\n
  *         0  a->Order = b->Order and a->Name = b->Name
  */
-function menu_cmp(&$a, &$b)
+function menu_cmp($a, $b)
 {
   if ($a->Order > $b->Order) {
     return (-1);
@@ -236,7 +225,7 @@ function menu_insert_r(&$menuItems, $path, $pathRemainder, $LastOrder, $Target, 
     if (! $menuItemsExist) {
       $menuItems = array();
     }
-    array_push($menuItems, $currentMenuItem);
+    $menuItems[] = $currentMenuItem;
     $sortItems = true;
   }
 
