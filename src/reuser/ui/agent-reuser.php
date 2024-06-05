@@ -154,6 +154,11 @@ class ReuserAgentPlugin extends AgentPlugin
 
     $packageDao->addUploadToPackage($uploadId, $package);
 
+    /**
+     *Hardcode reuseGroupId because fossology can not get reuseGroupId from the build.
+     * Fossology group ID value always is 3 on our system.
+     */
+    $reuseGroupId = 3;
     $this->uploadDao->addReusedUpload($uploadId, $reuseUploadId, $groupId, $reuseGroupId, $reuseMode);
   }
 
